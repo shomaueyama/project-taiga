@@ -4,7 +4,7 @@ import time
 
 def main() -> None:
     enabled = os.getenv("RUNNER_ENABLED", "false").lower() == "true"
-    print(f"Runner controller placeholder started; enabled={enabled}")
+    print(f"Runner controller placeholder started; enabled={enabled}", flush=True)
     while True:
         time.sleep(30)
 
