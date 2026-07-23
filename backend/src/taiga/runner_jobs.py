@@ -107,6 +107,9 @@ def queue_runner_job(
 
 
 def process_next_runner_job(session: Session) -> bool:
+    has_outbox = session.execute(text("SELECT to_regclass('public.outbox_events')")).scalar_one()
+    if has_outbox is None:
+        return False
     event = (
         session.execute(
             text(

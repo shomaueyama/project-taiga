@@ -10,10 +10,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
+COPY src ./src
 RUN pip install --no-cache-dir -e ".[dev]"
 
 COPY alembic.ini ./
-COPY src ./src
 COPY tests ./tests
 COPY alembic ./alembic
 
