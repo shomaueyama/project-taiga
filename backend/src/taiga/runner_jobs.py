@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 from taiga.api_schemas import RunnerJobResponse, RunSubmissionRequest
 from taiga.auth import Principal
 from taiga.config import get_settings
+from taiga.errors import FeatureDisabledError
+from taiga.state_transitions import runner_request_submission_status, runner_result_transition
 from taiga.submission_service import get_submission_summary
 
 
@@ -35,7 +37,7 @@ def queue_runner_job(
 ) -> RunnerJobResponse:
     settings = get_settings()
     if not settings.runner_enabled:
-        raise PermissionError("Runner is disabled")
+        raise FeatureDisabledError("Runner is disabled", code="runner_disabled")
     submission = get_submission_summary(session, principal, submission_id)
     existing = (
         session.execute(
@@ -90,8 +92,8 @@ def queue_runner_job(
         },
     )
     session.execute(
-        text("UPDATE submissions SET status = 'queued' WHERE id = :id"),
-        {"id": submission.id},
+        text("UPDATE submissions SET status = :status WHERE id = :id"),
+        {"id": submission.id, "status": runner_request_submission_status()},
     )
     row = (
         session.execute(
@@ -138,8 +140,7 @@ def process_next_runner_job(session: Session) -> bool:
         "publicTests": [],
         "hiddenTests": "redacted",
     }
-    status = "succeeded" if not settings.runner_enabled else "security_rejected"
-    submission_status = "manual_review_pending" if status == "succeeded" else "needs_revision"
+    status, submission_status = runner_result_transition(settings.runner_enabled)
     session.execute(
         text(
             """

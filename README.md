@@ -107,6 +107,8 @@ and unexpected HTTP 5xx responses.
 
 Phase 0 baseline and planning records are in `docs/phase-0/README.md`.
 Phase 1 local MVP completion records are in `docs/phase-1/README.md`.
+Phase 2 coverage/reliability records are in `docs/phase-2/`.
+Phase 3 domain and architecture refactoring records are in `docs/phase-3/`.
 
 ## Feature Flags
 
