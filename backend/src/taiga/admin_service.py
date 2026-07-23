@@ -22,11 +22,8 @@ from taiga.api_schemas import (
     UserProfile,
 )
 from taiga.auth import Principal
-
-
-def require_admin(principal: Principal) -> None:
-    if principal.role != "admin":
-        raise PermissionError("Admin role required")
+from taiga.authorization import require_admin
+from taiga.errors import NotFoundError
 
 
 def _user(row: Any) -> UserProfile:
@@ -120,7 +117,7 @@ def set_user_status(
         .first()
     )
     if row is None:
-        raise LookupError("User not found")
+        raise NotFoundError("User not found", code="user_not_found")
     return _user(row)
 
 
@@ -165,7 +162,7 @@ def update_flag(
         .first()
     )
     if row is None:
-        raise LookupError("Feature flag not found")
+        raise NotFoundError("Feature flag not found", code="feature_flag_not_found")
     return FeatureFlag(key=row["key"], enabled=row["enabled"], version=row["version"])
 
 

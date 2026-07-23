@@ -1,7 +1,8 @@
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Path, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from taiga.admin_service import (
@@ -57,6 +58,7 @@ from taiga.assignment_queries import (
 )
 from taiga.auth import Principal, get_current_principal
 from taiga.config import Settings, get_settings
+from taiga.errors import AppError
 from taiga.exam_service import (
     get_attempt_detail,
     list_exams,
@@ -88,6 +90,20 @@ app.add_middleware(
 settings_dependency = Depends(get_settings)
 session_dependency = Depends(get_session)
 principal_dependency = Depends(get_current_principal)
+assignment_id_path = Path(alias="assignmentId")
+upload_id_path = Path(alias="uploadId")
+submission_id_path = Path(alias="submissionId")
+exam_id_path = Path(alias="examId")
+attempt_id_path = Path(alias="attemptId")
+user_id_path = Path(alias="userId")
+
+
+@app.exception_handler(AppError)
+def app_error_handler(_request: object, exc: AppError) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.message, "code": exc.code},
+    )
 
 
 @app.get("/health", tags=["system"])
@@ -143,9 +159,9 @@ def assignments(
     return list_assignments(session, principal, min(limit, 100))
 
 
-@app.get("/api/v1/assignments/{assignment_id}", response_model=AssignmentDetail, tags=["learning"])
+@app.get("/api/v1/assignments/{assignmentId}", response_model=AssignmentDetail, tags=["learning"])
 def assignment_detail(
-    assignment_id: UUID,
+    assignment_id: UUID = assignment_id_path,
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
 ) -> AssignmentDetail:
@@ -179,14 +195,14 @@ def upload_presign(
 
 
 @app.post(
-    "/api/v1/uploads/{upload_id}/complete",
+    "/api/v1/uploads/{uploadId}/complete",
     response_model=UploadSessionResponse,
     status_code=status.HTTP_202_ACCEPTED,
     tags=["submissions"],
 )
 def upload_complete(
-    upload_id: UUID,
     request: CompleteUploadRequest,
+    upload_id: UUID = upload_id_path,
     _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
@@ -197,9 +213,9 @@ def upload_complete(
         raise HTTPException(status_code=404, detail="Upload not found") from exc
 
 
-@app.get("/api/v1/uploads/{upload_id}", response_model=UploadSessionResponse, tags=["submissions"])
+@app.get("/api/v1/uploads/{uploadId}", response_model=UploadSessionResponse, tags=["submissions"])
 def upload_state(
-    upload_id: UUID,
+    upload_id: UUID = upload_id_path,
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
 ) -> UploadSessionResponse:
@@ -210,14 +226,14 @@ def upload_state(
 
 
 @app.post(
-    "/api/v1/assignments/{assignment_id}/submissions",
+    "/api/v1/assignments/{assignmentId}/submissions",
     response_model=SubmissionResponse,
     status_code=status.HTTP_201_CREATED,
     tags=["submissions"],
 )
 def submit_assignment(
-    assignment_id: UUID,
     request: CreateSubmissionRequest,
+    assignment_id: UUID = assignment_id_path,
     _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
@@ -231,12 +247,12 @@ def submit_assignment(
 
 
 @app.get(
-    "/api/v1/submissions/{submission_id}",
+    "/api/v1/submissions/{submissionId}",
     response_model=SubmissionDetail,
     tags=["submissions"],
 )
 def submission_detail(
-    submission_id: UUID,
+    submission_id: UUID = submission_id_path,
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
 ) -> SubmissionDetail:
@@ -261,14 +277,14 @@ def queue(
 
 
 @app.post(
-    "/api/v1/submissions/{submission_id}/reviews",
+    "/api/v1/submissions/{submissionId}/reviews",
     response_model=ReviewResponse,
     status_code=status.HTTP_201_CREATED,
     tags=["reviews"],
 )
 def review_submission(
-    submission_id: UUID,
     request: CreateReviewRequest,
+    submission_id: UUID = submission_id_path,
     _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
@@ -284,14 +300,14 @@ def review_submission(
 
 
 @app.post(
-    "/api/v1/submissions/{submission_id}/run",
+    "/api/v1/submissions/{submissionId}/run",
     response_model=RunnerJobResponse,
     status_code=status.HTTP_202_ACCEPTED,
     tags=["runner"],
 )
 def run_submission(
-    submission_id: UUID,
     request: RunSubmissionRequest,
+    submission_id: UUID = submission_id_path,
     _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
@@ -314,14 +330,14 @@ def exams(
 
 
 @app.post(
-    "/api/v1/exams/{exam_id}/attempts",
+    "/api/v1/exams/{examId}/attempts",
     response_model=ExamAttemptResponse,
     status_code=status.HTTP_201_CREATED,
     tags=["exams"],
 )
 def create_exam_attempt(
-    exam_id: UUID,
     request: CreateExamAttemptRequest,
+    exam_id: UUID = exam_id_path,
     _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
@@ -334,9 +350,9 @@ def create_exam_attempt(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
-@app.get("/api/v1/exam-attempts/{attempt_id}", response_model=ExamAttemptDetail, tags=["exams"])
+@app.get("/api/v1/exam-attempts/{attemptId}", response_model=ExamAttemptDetail, tags=["exams"])
 def exam_attempt(
-    attempt_id: UUID,
+    attempt_id: UUID = attempt_id_path,
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
 ) -> ExamAttemptDetail:
@@ -347,13 +363,13 @@ def exam_attempt(
 
 
 @app.post(
-    "/api/v1/exam-attempts/{attempt_id}/start",
+    "/api/v1/exam-attempts/{attemptId}/start",
     response_model=ExamAttemptDetail,
     tags=["exams"],
 )
 def start_exam_attempt(
-    attempt_id: UUID,
     request: StartExamRequest,
+    attempt_id: UUID = attempt_id_path,
     _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
@@ -367,13 +383,13 @@ def start_exam_attempt(
 
 
 @app.post(
-    "/api/v1/exam-attempts/{attempt_id}/submit",
+    "/api/v1/exam-attempts/{attemptId}/submit",
     response_model=ExamAttemptDetail,
     tags=["exams"],
 )
 def submit_exam_attempt(
-    attempt_id: UUID,
     request: SubmitExamRequest,
+    attempt_id: UUID = attempt_id_path,
     _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
@@ -387,13 +403,13 @@ def submit_exam_attempt(
 
 
 @app.post(
-    "/api/v1/exam-attempts/{attempt_id}/oral-review",
+    "/api/v1/exam-attempts/{attemptId}/oral-review",
     response_model=ExamAttemptDetail,
     tags=["exams"],
 )
 def oral_review_attempt(
-    attempt_id: UUID,
     request: OralReviewRequest,
+    attempt_id: UUID = attempt_id_path,
     _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
@@ -457,9 +473,9 @@ def admin_invite_user(
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
-@app.post("/api/v1/admin/users/{user_id}/suspend", response_model=UserProfile, tags=["admin"])
+@app.post("/api/v1/admin/users/{userId}/suspend", response_model=UserProfile, tags=["admin"])
 def admin_suspend_user(
-    user_id: UUID,
+    user_id: UUID = user_id_path,
     _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
@@ -472,9 +488,9 @@ def admin_suspend_user(
         raise HTTPException(status_code=404, detail="User not found") from exc
 
 
-@app.post("/api/v1/admin/users/{user_id}/restore", response_model=UserProfile, tags=["admin"])
+@app.post("/api/v1/admin/users/{userId}/restore", response_model=UserProfile, tags=["admin"])
 def admin_restore_user(
-    user_id: UUID,
+    user_id: UUID = user_id_path,
     _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
     principal: Principal = principal_dependency,
     session: Session = session_dependency,

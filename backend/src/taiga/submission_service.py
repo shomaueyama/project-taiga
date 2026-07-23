@@ -22,7 +22,13 @@ from taiga.api_schemas import (
     UploadSessionResponse,
 )
 from taiga.auth import Principal
+from taiga.authorization import is_reviewer, require_reviewer
 from taiga.config import get_settings
+from taiga.errors import ConflictError, NotFoundError
+from taiga.state_transitions import (
+    review_submission_transition,
+    submission_status_after_creation,
+)
 
 ALLOWED_EXTENSIONS = {".c", ".h", ".md", ".txt", ".json", ".sh", ".png", ".jpg", ".jpeg", ".zip"}
 MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
@@ -137,7 +143,7 @@ def get_upload_row(session: Session, principal: Principal, upload_id: uuid.UUID)
         .first()
     )
     if row is None:
-        raise LookupError("Upload not found")
+        raise NotFoundError("Upload not found", code="upload_not_found")
     return row
 
 
@@ -220,7 +226,7 @@ def create_submission(
         .first()
     )
     if assignment is None:
-        raise LookupError("Assignment not found")
+        raise NotFoundError("Assignment not found", code="assignment_not_found")
     upload_rows = (
         session.execute(
             text(
@@ -239,7 +245,7 @@ def create_submission(
         .all()
     )
     if len(upload_rows) != len(request.uploadIds):
-        raise ValueError("All uploads must be accepted")
+        raise ConflictError("All uploads must be accepted", code="uploads_not_accepted")
     version = int(
         session.execute(
             text(
@@ -257,6 +263,7 @@ def create_submission(
         "uploadIds": [str(upload_id) for upload_id in request.uploadIds],
         "sourceType": request.sourceType,
     }
+    submission_status = submission_status_after_creation()
     session.execute(
         text(
             """
@@ -267,7 +274,7 @@ def create_submission(
             VALUES (
                 :id, :assignment_id, :learner_id, :submission_version, :source_type,
                 :repository_url, :commit_hash, CAST(:artifact_manifest_json AS jsonb),
-                'manual_review_pending'
+                :status
             )
             """
         ),
@@ -280,6 +287,7 @@ def create_submission(
             "repository_url": request.repositoryUrl,
             "commit_hash": request.commitHash,
             "artifact_manifest_json": _json(manifest),
+            "status": submission_status,
         },
     )
     for upload in upload_rows:
@@ -318,7 +326,7 @@ def create_submission(
             "id": uuid.uuid4(),
             "aggregate_id": submission_id,
             "payload": _json(
-                {"submissionId": str(submission_id), "status": "manual_review_pending"}
+                {"submissionId": str(submission_id), "status": submission_status}
             ),
         },
     )
@@ -361,14 +369,14 @@ def get_submission_summary(
             {
                 "id": submission_id,
                 "learner_id": principal.id,
-                "is_reviewer": principal.role in {"reviewer", "admin"},
+                "is_reviewer": is_reviewer(principal),
             },
         )
         .mappings()
         .first()
     )
     if row is None:
-        raise LookupError("Submission not found")
+        raise NotFoundError("Submission not found", code="submission_not_found")
     return _submission(row)
 
 
@@ -414,8 +422,7 @@ def get_submission_detail(
 
 
 def review_queue(session: Session, principal: Principal, limit: int = 20) -> ReviewQueuePage:
-    if principal.role not in {"reviewer", "admin"}:
-        raise PermissionError("Reviewer role required")
+    require_reviewer(principal)
     rows = (
         session.execute(
             text(
@@ -441,8 +448,7 @@ def create_review(
     submission_id: uuid.UUID,
     request: CreateReviewRequest,
 ) -> ReviewResponse:
-    if principal.role not in {"reviewer", "admin"}:
-        raise PermissionError("Reviewer role required")
+    require_reviewer(principal)
     submission_row = (
         session.execute(
             text(
@@ -456,17 +462,19 @@ def create_review(
             {
                 "id": submission_id,
                 "learner_id": principal.id,
-                "is_reviewer": principal.role in {"reviewer", "admin"},
+                "is_reviewer": is_reviewer(principal),
             },
         )
         .mappings()
         .first()
     )
     if submission_row is None:
-        raise LookupError("Submission not found")
+        raise NotFoundError("Submission not found", code="submission_not_found")
     submission = _submission(submission_row)
-    if submission.status != "manual_review_pending":
-        raise ValueError("Submission is not awaiting review")
+    submission_status, assignment_status = review_submission_transition(
+        submission.status,
+        request.result,
+    )
     review_id = uuid.uuid4()
     session.execute(
         text(
@@ -482,16 +490,15 @@ def create_review(
             "id": review_id,
             "submission_id": submission.id,
             "reviewer_id": principal.id,
-            "result": request.result,
+            "result": submission_status,
             "rubric_json": _json(request.rubric),
             "comment": request.comment,
         },
     )
     session.execute(
         text("UPDATE submissions SET status = :status WHERE id = :id"),
-        {"id": submission_id, "status": request.result},
+        {"id": submission_id, "status": submission_status},
     )
-    assignment_status = "completed" if request.result == "approved" else "in_progress"
     session.execute(
         text(
             """

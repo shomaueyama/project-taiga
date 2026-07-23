@@ -19,7 +19,14 @@ from taiga.api_schemas import (
     SubmitExamRequest,
 )
 from taiga.auth import Principal
+from taiga.authorization import is_reviewer, require_reviewer
 from taiga.config import get_settings
+from taiga.errors import ConflictError, FeatureDisabledError, NotFoundError
+from taiga.state_transitions import (
+    oral_review_transition,
+    start_exam_transition,
+    submit_exam_transition,
+)
 
 
 def _json(value: object) -> str:
@@ -72,7 +79,7 @@ def reserve_attempt(
     _request: CreateExamAttemptRequest,
 ) -> ExamAttemptResponse:
     if not get_settings().exam_enabled:
-        raise PermissionError("Exam is disabled")
+        raise FeatureDisabledError("Exam is disabled", code="exam_disabled")
     variant = (
         session.execute(
             text(
@@ -98,7 +105,7 @@ def reserve_attempt(
         .first()
     )
     if variant is None:
-        raise ValueError("No unseen exam variant is available")
+        raise ConflictError("No unseen exam variant is available", code="no_exam_variant_available")
     attempt_number = int(
         session.execute(
             text(
@@ -160,14 +167,14 @@ def _attempt_row(session: Session, principal: Principal, attempt_id: uuid.UUID) 
             {
                 "id": attempt_id,
                 "learner_id": principal.id,
-                "is_reviewer": principal.role in {"reviewer", "admin"},
+                "is_reviewer": is_reviewer(principal),
             },
         )
         .mappings()
         .first()
     )
     if row is None:
-        raise LookupError("Exam attempt not found")
+        raise NotFoundError("Exam attempt not found", code="exam_attempt_not_found")
     return row
 
 
@@ -194,23 +201,28 @@ def start_attempt(
     request: StartExamRequest,
 ) -> ExamAttemptDetail:
     if not get_settings().exam_enabled:
-        raise PermissionError("Exam is disabled")
+        raise FeatureDisabledError("Exam is disabled", code="exam_disabled")
     if not request.acknowledgeRules:
-        raise ValueError("Exam rules must be acknowledged")
+        raise ConflictError("Exam rules must be acknowledged", code="exam_rules_not_acknowledged")
     row = _attempt_row(session, principal, attempt_id)
-    if row["status"] == "ready":
+    next_status = start_exam_transition(row["status"])
+    if next_status == "in_progress" and row["status"] != "in_progress":
         session.execute(
             text(
                 """
                 UPDATE exam_attempts
-                SET status = 'in_progress',
+                SET status = :status,
                     starts_at = now(),
                     deadline_at = now() + (:duration_seconds * interval '1 second'),
                     version = version + 1
                 WHERE id = :id
                 """
             ),
-            {"id": attempt_id, "duration_seconds": int(timedelta(minutes=60).total_seconds())},
+            {
+                "id": attempt_id,
+                "status": next_status,
+                "duration_seconds": int(timedelta(minutes=60).total_seconds()),
+            },
         )
     return get_attempt_detail(session, principal, attempt_id)
 
@@ -222,7 +234,7 @@ def submit_attempt(
     request: SubmitExamRequest,
 ) -> ExamAttemptDetail:
     if not get_settings().exam_enabled:
-        raise PermissionError("Exam is disabled")
+        raise FeatureDisabledError("Exam is disabled", code="exam_disabled")
     row = _attempt_row(session, principal, attempt_id)
     if row["status"] != "in_progress":
         return get_attempt_detail(session, principal, attempt_id)
@@ -234,8 +246,8 @@ def submit_attempt(
     )
     if late:
         session.execute(
-            text("UPDATE exam_attempts SET status = 'expired' WHERE id = :id"),
-            {"id": attempt_id},
+            text("UPDATE exam_attempts SET status = :status WHERE id = :id"),
+            {"id": attempt_id, "status": submit_exam_transition(row["status"], late=True)},
         )
         return get_attempt_detail(session, principal, attempt_id)
     result = {
@@ -246,7 +258,7 @@ def submit_attempt(
         text(
             """
             UPDATE exam_attempts
-            SET status = 'oral_pending',
+            SET status = :status,
                 submitted_at = now(),
                 final_submission_id = :submission_id,
                 result_json = CAST(:result AS jsonb),
@@ -254,7 +266,12 @@ def submit_attempt(
             WHERE id = :id
             """
         ),
-        {"id": attempt_id, "submission_id": request.submissionId, "result": _json(result)},
+        {
+            "id": attempt_id,
+            "status": submit_exam_transition(row["status"], late=False),
+            "submission_id": request.submissionId,
+            "result": _json(result),
+        },
     )
     return get_attempt_detail(session, principal, attempt_id)
 
@@ -266,10 +283,10 @@ def oral_review(
     request: OralReviewRequest,
 ) -> ExamAttemptDetail:
     if not get_settings().exam_enabled:
-        raise PermissionError("Exam is disabled")
-    if principal.role not in {"reviewer", "admin"}:
-        raise PermissionError("Reviewer role required")
-    status = "passed" if request.passed else "failed"
+        raise FeatureDisabledError("Exam is disabled", code="exam_disabled")
+    require_reviewer(principal)
+    row = _attempt_row(session, principal, attempt_id)
+    status = oral_review_transition(row["status"], passed=request.passed)
     session.execute(
         text(
             """
@@ -292,7 +309,6 @@ def oral_review(
         },
     )
     if status == "passed":
-        row = _attempt_row(session, principal, attempt_id)
         session.execute(
             text(
                 """
