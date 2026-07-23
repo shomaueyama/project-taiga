@@ -28,6 +28,65 @@ class SubmissionSnapshot(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class CreateUploadRequest(BaseModel):
+    originalName: str
+    mediaType: str
+    sizeBytes: int
+    sha256: str
+
+
+class CompleteUploadRequest(BaseModel):
+    sizeBytes: int
+    sha256: str
+
+
+class UploadSessionResponse(BaseModel):
+    id: UUID
+    status: str
+    uploadUrl: str | None = None
+    expiresAt: str
+    rejectionCode: str | None = None
+
+
+class CreateSubmissionRequest(BaseModel):
+    sourceType: Literal["public_git", "zip_upload", "file_upload"]
+    repositoryUrl: str | None = None
+    commitHash: str | None = None
+    uploadIds: list[UUID]
+
+
+class SubmissionResponse(BaseModel):
+    id: UUID
+    assignmentId: UUID
+    version: int
+    status: str
+    createdAt: str
+
+
+class SubmissionDetail(BaseModel):
+    submission: SubmissionResponse
+    artifacts: list[dict[str, Any]]
+    sanitizedResult: dict[str, Any] | None = None
+
+
+class CreateReviewRequest(BaseModel):
+    result: Literal["approved", "needs_revision"]
+    rubric: dict[str, Any]
+    comment: str
+
+
+class ReviewResponse(BaseModel):
+    id: UUID
+    result: str
+    comment: str
+    createdAt: str
+
+
+class ReviewQueuePage(BaseModel):
+    items: list[SubmissionResponse]
+    nextCursor: str | None
+
+
 class AssignmentDetail(BaseModel):
     assignment: AssignmentSummary
     instructions: list[str]

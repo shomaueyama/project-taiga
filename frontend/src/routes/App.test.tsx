@@ -48,6 +48,9 @@ describe("App", () => {
         if (url.endsWith("/assignments")) {
           return { ok: true, json: async () => ({ items: [], nextCursor: null }) };
         }
+        if (url.endsWith("/reviews/queue")) {
+          return { ok: true, json: async () => ({ items: [], nextCursor: null }) };
+        }
         return {
           ok: true,
           json: async () => ({ completedWeeks: 0, capabilities: [], rank: null }),
