@@ -8,17 +8,24 @@ from taiga.api_schemas import (
     AssignmentDetail,
     AssignmentPage,
     CompleteUploadRequest,
+    CreateExamAttemptRequest,
     CreateReviewRequest,
     CreateSubmissionRequest,
     CreateUploadRequest,
     Dashboard,
+    ExamAttemptDetail,
+    ExamAttemptResponse,
+    ExamPage,
+    OralReviewRequest,
     Progress,
     ReviewQueuePage,
     ReviewResponse,
     RunnerJobResponse,
     RunSubmissionRequest,
+    StartExamRequest,
     SubmissionDetail,
     SubmissionResponse,
+    SubmitExamRequest,
     UploadSessionResponse,
     UserProfile,
 )
@@ -30,6 +37,14 @@ from taiga.assignment_queries import (
 )
 from taiga.auth import Principal, get_current_principal
 from taiga.config import Settings, get_settings
+from taiga.exam_service import (
+    get_attempt_detail,
+    list_exams,
+    oral_review,
+    reserve_attempt,
+    start_attempt,
+    submit_attempt,
+)
 from taiga.infrastructure.database import database_ready, get_session
 from taiga.runner_jobs import queue_runner_job
 from taiga.submission_service import (
@@ -263,3 +278,99 @@ def run_submission(
         return queue_runner_job(session, principal, submission_id, request)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Submission not found") from exc
+
+
+@app.get("/api/v1/exams", response_model=ExamPage, tags=["exams"])
+def exams(
+    limit: int = 20,
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> ExamPage:
+    return list_exams(session, principal, min(limit, 100))
+
+
+@app.post(
+    "/api/v1/exams/{exam_id}/attempts",
+    response_model=ExamAttemptResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["exams"],
+)
+def create_exam_attempt(
+    exam_id: UUID,
+    request: CreateExamAttemptRequest,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> ExamAttemptResponse:
+    try:
+        return reserve_attempt(session, principal, exam_id, request)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/exam-attempts/{attempt_id}", response_model=ExamAttemptDetail, tags=["exams"])
+def exam_attempt(
+    attempt_id: UUID,
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> ExamAttemptDetail:
+    try:
+        return get_attempt_detail(session, principal, attempt_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Exam attempt not found") from exc
+
+
+@app.post(
+    "/api/v1/exam-attempts/{attempt_id}/start",
+    response_model=ExamAttemptDetail,
+    tags=["exams"],
+)
+def start_exam_attempt(
+    attempt_id: UUID,
+    request: StartExamRequest,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> ExamAttemptDetail:
+    try:
+        return start_attempt(session, principal, attempt_id, request)
+    except (LookupError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post(
+    "/api/v1/exam-attempts/{attempt_id}/submit",
+    response_model=ExamAttemptDetail,
+    tags=["exams"],
+)
+def submit_exam_attempt(
+    attempt_id: UUID,
+    request: SubmitExamRequest,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> ExamAttemptDetail:
+    try:
+        return submit_attempt(session, principal, attempt_id, request)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Exam attempt not found") from exc
+
+
+@app.post(
+    "/api/v1/exam-attempts/{attempt_id}/oral-review",
+    response_model=ExamAttemptDetail,
+    tags=["exams"],
+)
+def oral_review_attempt(
+    attempt_id: UUID,
+    request: OralReviewRequest,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> ExamAttemptDetail:
+    try:
+        return oral_review(session, principal, attempt_id, request)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Exam attempt not found") from exc

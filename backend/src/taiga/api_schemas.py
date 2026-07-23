@@ -114,8 +114,53 @@ class AssignmentPage(BaseModel):
 class ExamSummary(BaseModel):
     id: UUID
     stableCode: str
+    title: str = ""
     scheduledAt: str
-    status: str = "ready"
+
+
+class ExamPage(BaseModel):
+    items: list[ExamSummary]
+    nextCursor: str | None
+
+
+class CreateExamAttemptRequest(BaseModel):
+    pass
+
+
+class ExamAttemptResponse(BaseModel):
+    id: UUID
+    examId: UUID
+    status: str
+    attemptNumber: int
+
+
+class ExamAttemptDetail(BaseModel):
+    attempt: ExamAttemptResponse
+    variantSnapshot: dict[str, Any]
+    startsAt: str | None
+    deadlineAt: str | None
+    submittedAt: str | None
+    result: dict[str, Any] | None
+
+
+class StartExamRequest(BaseModel):
+    acknowledgeRules: bool = True
+
+
+class SubmitExamRequest(BaseModel):
+    submissionId: UUID | None = None
+    answers: dict[str, Any] = {}
+
+
+class OralAnswer(BaseModel):
+    question: str
+    assessment: str
+    note: str | None = None
+
+
+class OralReviewRequest(BaseModel):
+    passed: bool
+    answers: list[OralAnswer]
 
 
 class Dashboard(BaseModel):
