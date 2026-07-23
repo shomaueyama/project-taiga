@@ -180,3 +180,72 @@ class Progress(BaseModel):
     completedWeeks: int
     capabilities: list[CapabilityProgress]
     rank: str | None
+
+
+class PageUserProfile(BaseModel):
+    items: list[UserProfile]
+    nextCursor: str | None
+
+
+class InviteUserRequest(BaseModel):
+    email: str
+    displayName: str
+    role: Literal["learner", "reviewer", "admin"]
+
+
+class FeatureFlag(BaseModel):
+    key: str
+    enabled: bool
+    version: int
+
+
+class FeatureFlagList(BaseModel):
+    items: list[FeatureFlag]
+
+
+class UpdateFeatureFlagRequest(BaseModel):
+    enabled: bool
+
+
+class NotificationResponse(BaseModel):
+    id: UUID
+    type: str
+    title: str
+    body: str
+    readAt: str | None
+    createdAt: str
+
+
+class NotificationPage(BaseModel):
+    items: list[NotificationResponse]
+    nextCursor: str | None
+
+
+class NotificationPreference(BaseModel):
+    channel: str
+    eventType: str
+    enabled: bool
+
+
+class NotificationPreferenceList(BaseModel):
+    items: list[NotificationPreference]
+
+
+class LearningAnalytics(BaseModel):
+    learners: int
+    submissions: int
+    approvedSubmissions: int
+    examAttempts: int
+    passedExamAttempts: int
+
+
+class CurriculumVersionSummary(BaseModel):
+    id: UUID
+    version: str
+    status: str
+    contentHash: str
+
+
+class CurriculumVersionPage(BaseModel):
+    items: list[CurriculumVersionSummary]
+    nextCursor: str | None

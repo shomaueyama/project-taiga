@@ -4,6 +4,17 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
+from taiga.admin_service import (
+    analytics,
+    curriculum_versions,
+    invite_user,
+    list_flags,
+    list_notifications,
+    list_users,
+    notification_preferences,
+    set_user_status,
+    update_flag,
+)
 from taiga.api_schemas import (
     AssignmentDetail,
     AssignmentPage,
@@ -12,11 +23,19 @@ from taiga.api_schemas import (
     CreateReviewRequest,
     CreateSubmissionRequest,
     CreateUploadRequest,
+    CurriculumVersionPage,
     Dashboard,
     ExamAttemptDetail,
     ExamAttemptResponse,
     ExamPage,
+    FeatureFlag,
+    FeatureFlagList,
+    InviteUserRequest,
+    LearningAnalytics,
+    NotificationPage,
+    NotificationPreferenceList,
     OralReviewRequest,
+    PageUserProfile,
     Progress,
     ReviewQueuePage,
     ReviewResponse,
@@ -26,6 +45,7 @@ from taiga.api_schemas import (
     SubmissionDetail,
     SubmissionResponse,
     SubmitExamRequest,
+    UpdateFeatureFlagRequest,
     UploadSessionResponse,
     UserProfile,
 )
@@ -374,3 +394,138 @@ def oral_review_attempt(
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Exam attempt not found") from exc
+
+
+@app.get("/api/v1/notifications", response_model=NotificationPage, tags=["notifications"])
+def notifications(
+    limit: int = 20,
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> NotificationPage:
+    return list_notifications(session, principal, min(limit, 100))
+
+
+@app.get(
+    "/api/v1/notification-preferences",
+    response_model=NotificationPreferenceList,
+    tags=["notifications"],
+)
+def preferences(
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> NotificationPreferenceList:
+    return notification_preferences(session, principal)
+
+
+@app.get("/api/v1/admin/users", response_model=PageUserProfile, tags=["admin"])
+def admin_users(
+    limit: int = 20,
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> PageUserProfile:
+    try:
+        return list_users(session, principal, min(limit, 100))
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@app.post(
+    "/api/v1/admin/users/invitations",
+    response_model=UserProfile,
+    status_code=status.HTTP_201_CREATED,
+    tags=["admin"],
+)
+def admin_invite_user(
+    request: InviteUserRequest,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> UserProfile:
+    try:
+        return invite_user(session, principal, request)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@app.post("/api/v1/admin/users/{user_id}/suspend", response_model=UserProfile, tags=["admin"])
+def admin_suspend_user(
+    user_id: UUID,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> UserProfile:
+    try:
+        return set_user_status(session, principal, user_id, "suspended")
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="User not found") from exc
+
+
+@app.post("/api/v1/admin/users/{user_id}/restore", response_model=UserProfile, tags=["admin"])
+def admin_restore_user(
+    user_id: UUID,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> UserProfile:
+    try:
+        return set_user_status(session, principal, user_id, "active")
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="User not found") from exc
+
+
+@app.get("/api/v1/admin/feature-flags", response_model=FeatureFlagList, tags=["admin"])
+def admin_feature_flags(
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> FeatureFlagList:
+    try:
+        return list_flags(session, principal)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@app.patch("/api/v1/admin/feature-flags/{key}", response_model=FeatureFlag, tags=["admin"])
+def admin_update_feature_flag(
+    key: str,
+    request: UpdateFeatureFlagRequest,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> FeatureFlag:
+    try:
+        return update_flag(session, principal, key, request)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Feature flag not found") from exc
+
+
+@app.get("/api/v1/admin/analytics/learning", response_model=LearningAnalytics, tags=["admin"])
+def admin_learning_analytics(
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> LearningAnalytics:
+    try:
+        return analytics(session, principal)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@app.get(
+    "/api/v1/admin/curriculum/versions",
+    response_model=CurriculumVersionPage,
+    tags=["admin"],
+)
+def admin_curriculum_versions(
+    limit: int = 20,
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> CurriculumVersionPage:
+    try:
+        return curriculum_versions(session, principal, min(limit, 100))
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
