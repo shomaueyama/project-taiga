@@ -1,7 +1,7 @@
 from collections.abc import Awaitable, Callable
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Path, Request, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Path, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -98,6 +98,7 @@ submission_id_path = Path(alias="submissionId")
 exam_id_path = Path(alias="examId")
 attempt_id_path = Path(alias="attemptId")
 user_id_path = Path(alias="userId")
+list_limit_query = Query(default=20, ge=1, le=100)
 
 
 @app.exception_handler(AppError)
@@ -168,7 +169,7 @@ def dashboard(
 
 @app.get("/api/v1/assignments", response_model=AssignmentPage, tags=["learning"])
 def assignments(
-    limit: int = 20,
+    limit: int = list_limit_query,
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
 ) -> AssignmentPage:
@@ -281,7 +282,7 @@ def submission_detail(
 @app.get("/api/v1/reviews/queue", response_model=ReviewQueuePage, tags=["reviews"])
 def queue(
     response: Response,
-    limit: int = 20,
+    limit: int = list_limit_query,
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
 ) -> ReviewQueuePage:
@@ -338,7 +339,7 @@ def run_submission(
 
 @app.get("/api/v1/exams", response_model=ExamPage, tags=["exams"])
 def exams(
-    limit: int = 20,
+    limit: int = list_limit_query,
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
 ) -> ExamPage:
@@ -440,7 +441,7 @@ def oral_review_attempt(
 
 @app.get("/api/v1/notifications", response_model=NotificationPage, tags=["notifications"])
 def notifications(
-    limit: int = 20,
+    limit: int = list_limit_query,
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
 ) -> NotificationPage:
@@ -461,7 +462,7 @@ def preferences(
 
 @app.get("/api/v1/admin/users", response_model=PageUserProfile, tags=["admin"])
 def admin_users(
-    limit: int = 20,
+    limit: int = list_limit_query,
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
 ) -> PageUserProfile:
@@ -563,7 +564,7 @@ def admin_learning_analytics(
     tags=["admin"],
 )
 def admin_curriculum_versions(
-    limit: int = 20,
+    limit: int = list_limit_query,
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
 ) -> CurriculumVersionPage:

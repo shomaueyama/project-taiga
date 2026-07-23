@@ -452,6 +452,22 @@ def test_runner_rejects_unsafe_payloads_and_worker_bounds_poison_messages(
         {"id": outbox_id},
     )
 
+    clean = client.post(
+        f"/api/v1/submissions/{submission['id']}/run",
+        json={"reason": "manual"},
+        headers=headers(),
+    )
+    assert clean.status_code == 202
+    with SessionLocal.begin() as session:
+        assert process_next_runner_job(session) is True
+    assert (
+        scalar(
+            "SELECT status::text FROM runner_jobs WHERE id = :id",
+            {"id": UUID(clean.json()["id"])},
+        )
+        == "security_rejected"
+    )
+
 
 def test_security_sensitive_flags_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("RUNNER_ENABLED", "definitely")

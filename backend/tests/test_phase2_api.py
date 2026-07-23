@@ -135,6 +135,28 @@ def test_assignment_dashboard_detail_progress_and_ownership(
     assert missing.status_code == 404
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/assignments",
+        "/api/v1/reviews/queue",
+        "/api/v1/exams",
+        "/api/v1/admin/users",
+        "/api/v1/admin/curriculum/versions",
+    ],
+)
+def test_list_limits_are_bounded(seeded: None, client: TestClient, path: str) -> None:
+    email = (
+        "admin@example.local"
+        if "/admin/" in path or "reviews" in path
+        else "taiga@example.local"
+    )
+    assert client.get(f"{path}?limit=0", headers=headers(email)).status_code == 422
+    assert client.get(f"{path}?limit=101", headers=headers(email)).status_code == 422
+    ok = client.get(f"{path}?limit=100", headers=headers(email))
+    assert ok.status_code == 200
+
+
 def test_admin_operations_and_notifications(seeded: None, client: TestClient) -> None:
     reviewer_users = client.get("/api/v1/admin/users", headers=headers("reviewer@example.local"))
     assert reviewer_users.status_code == 403
