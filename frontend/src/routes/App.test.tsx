@@ -46,7 +46,38 @@ describe("App", () => {
           };
         }
         if (url.endsWith("/assignments")) {
-          return { ok: true, json: async () => ({ items: [], nextCursor: null }) };
+          return {
+            ok: true,
+            json: async () => ({
+              items: [
+                {
+                  id: "00000000-0000-0000-0000-000000000002",
+                  stableCode: "TASK-001",
+                  title: "Typing basics",
+                  scheduledDate: "2026-07-23",
+                  status: "available",
+                },
+              ],
+              nextCursor: null,
+            }),
+          };
+        }
+        if (url.includes("/assignments/")) {
+          return {
+            ok: true,
+            json: async () => ({
+              assignment: {
+                id: "00000000-0000-0000-0000-000000000002",
+                stableCode: "TASK-001",
+                title: "Typing basics",
+                scheduledDate: "2026-07-23",
+                status: "available",
+              },
+              instructions: ["Submit a short answer."],
+              submissionSpec: {},
+              submissions: [],
+            }),
+          };
         }
         if (url.endsWith("/reviews/queue")) {
           return { ok: true, json: async () => ({ items: [], nextCursor: null }) };

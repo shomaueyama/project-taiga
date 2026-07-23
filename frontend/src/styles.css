@@ -99,6 +99,22 @@ h1 {
   min-height: 40px;
 }
 
+button {
+  min-height: 36px;
+  border: 1px solid #adc0ba;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #18201f;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:disabled {
+  color: #7a8783;
+  background: #f3f5f4;
+  cursor: not-allowed;
+}
+
 .metric-row,
 .assignment-row {
   display: flex;
@@ -129,6 +145,34 @@ h1 {
   font-size: 0.88rem;
 }
 
+.row-actions,
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.detail-box,
+.flag-list {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #edf1ef;
+  border-radius: 8px;
+  color: #52615d;
+}
+
+.flag-list {
+  padding-left: 28px;
+}
+
+.admin-panel {
+  grid-column: span 2;
+}
+
 @media (max-width: 720px) {
   .workspace {
     grid-template-columns: 1fr;
@@ -136,6 +180,10 @@ h1 {
 
   .app-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-panel {
+    grid-column: auto;
   }
 
   h1 {
