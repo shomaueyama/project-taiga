@@ -1,6 +1,7 @@
+from collections.abc import Awaitable, Callable
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Path, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Path, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -69,6 +70,7 @@ from taiga.exam_service import (
 )
 from taiga.infrastructure.database import database_ready, get_session
 from taiga.runner_jobs import queue_runner_job
+from taiga.security import add_security_headers, rate_limit_allows, too_many_requests_response
 from taiga.submission_service import (
     complete_upload,
     create_review,
@@ -84,8 +86,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Local-User"],
 )
 settings_dependency = Depends(get_settings)
 session_dependency = Depends(get_session)
@@ -99,11 +101,25 @@ user_id_path = Path(alias="userId")
 
 
 @app.exception_handler(AppError)
-def app_error_handler(_request: object, exc: AppError) -> JSONResponse:
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.message, "code": exc.code},
+def app_error_handler(_request: object, exc: AppError) -> Response:
+    return add_security_headers(
+        JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.message, "code": exc.code},
+        )
     )
+
+
+@app.middleware("http")
+async def security_middleware(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    settings = get_settings()
+    if not rate_limit_allows(request, settings):
+        return too_many_requests_response()
+    response = await call_next(request)
+    return add_security_headers(response)
 
 
 @app.get("/health", tags=["system"])

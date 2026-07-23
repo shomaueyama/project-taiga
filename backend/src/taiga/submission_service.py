@@ -31,6 +31,18 @@ from taiga.state_transitions import (
 )
 
 ALLOWED_EXTENSIONS = {".c", ".h", ".md", ".txt", ".json", ".sh", ".png", ".jpg", ".jpeg", ".zip"}
+ALLOWED_MEDIA_TYPES = {
+    ".c": {"text/plain", "text/x-c"},
+    ".h": {"text/plain", "text/x-c"},
+    ".md": {"text/markdown", "text/plain"},
+    ".txt": {"text/plain"},
+    ".json": {"application/json", "text/json"},
+    ".sh": {"text/x-shellscript", "text/plain"},
+    ".png": {"image/png"},
+    ".jpg": {"image/jpeg"},
+    ".jpeg": {"image/jpeg"},
+    ".zip": {"application/zip", "application/x-zip-compressed"},
+}
 MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
 
 
@@ -68,10 +80,21 @@ def _extension(name: str) -> str:
 def validate_upload_request(request: CreateUploadRequest) -> str | None:
     if len(request.originalName) > 120:
         return "filename_too_long"
+    if any(ord(char) < 32 for char in request.originalName):
+        return "invalid_filename"
+    if Path(request.originalName).is_absolute() or request.originalName.startswith("~"):
+        return "path_traversal"
     if "/" in request.originalName or "\\" in request.originalName or ".." in request.originalName:
         return "path_traversal"
-    if _extension(request.originalName) not in ALLOWED_EXTENSIONS:
+    if ":" in request.originalName:
+        return "path_traversal"
+    extension = _extension(request.originalName)
+    if extension not in ALLOWED_EXTENSIONS:
         return "extension_not_allowed"
+    if request.mediaType not in ALLOWED_MEDIA_TYPES[extension]:
+        return "media_type_mismatch"
+    if request.sizeBytes == 0:
+        return "empty_file"
     if request.sizeBytes < 0 or request.sizeBytes > MAX_UPLOAD_SIZE_BYTES:
         return "size_limit_exceeded"
     if not _is_sha256(request.sha256):
@@ -94,7 +117,7 @@ def create_upload(
     stored_original_name = request.originalName[:120]
     stored_size_bytes = min(max(request.sizeBytes, 0), MAX_UPLOAD_SIZE_BYTES)
     stored_sha256 = request.sha256 if _is_sha256(request.sha256) else "0" * 64
-    object_key = f"quarantine/{principal.id}/{upload_id}/{stored_original_name}"
+    object_key = f"quarantine/{principal.id}/{upload_id}/upload{_extension(stored_original_name)}"
     expires_at = datetime.now(UTC) + timedelta(minutes=15)
     session.execute(
         text(

@@ -86,6 +86,15 @@ def scalar(query: str, params: dict[str, object] | None = None) -> Any:
         return session.execute(text(query), params or {}).scalar_one()
 
 
+def execute(query: str, params: dict[str, object] | None = None) -> None:
+    with SessionLocal.begin() as session:
+        session.execute(text(query), params or {})
+
+
+def delete_exam_attempt(attempt_id: str) -> None:
+    execute("DELETE FROM exam_attempts WHERE id = :id", {"id": UUID(attempt_id)})
+
+
 def create_submission(client: TestClient) -> dict[str, Any]:
     assignment_id = client.get("/api/v1/assignments", headers=headers()).json()["items"][0]["id"]
     sha256 = "a" * 64
@@ -183,20 +192,23 @@ def test_oral_review_invalid_transition_rolls_back_without_rank_history(
     attempt = client.post(f"/api/v1/exams/{exam_id}/attempts", json={}, headers=headers())
     assert attempt.status_code == 201
     attempt_id = attempt.json()["id"]
-    before = scalar("SELECT count(*) FROM rank_history")
-    invalid = client.post(
-        f"/api/v1/exam-attempts/{attempt_id}/oral-review",
-        json={"passed": True, "answers": [{"question": "q", "assessment": "pass"}]},
-        headers=headers("admin@example.local"),
-    )
-    assert invalid.status_code == 409
-    assert invalid.json()["code"] == "exam_not_oral_pending"
-    assert scalar("SELECT count(*) FROM rank_history") == before
-    assert scalar(
-        "SELECT status::text FROM exam_attempts WHERE id = :id",
-        {"id": UUID(attempt_id)},
-    ) == "ready"
-    get_settings.cache_clear()
+    try:
+        before = scalar("SELECT count(*) FROM rank_history")
+        invalid = client.post(
+            f"/api/v1/exam-attempts/{attempt_id}/oral-review",
+            json={"passed": True, "answers": [{"question": "q", "assessment": "pass"}]},
+            headers=headers("admin@example.local"),
+        )
+        assert invalid.status_code == 409
+        assert invalid.json()["code"] == "exam_not_oral_pending"
+        assert scalar("SELECT count(*) FROM rank_history") == before
+        assert scalar(
+            "SELECT status::text FROM exam_attempts WHERE id = :id",
+            {"id": UUID(attempt_id)},
+        ) == "ready"
+    finally:
+        delete_exam_attempt(attempt_id)
+        get_settings.cache_clear()
 
 
 def test_implemented_api_paths_remain_within_design_contract() -> None:
