@@ -1,10 +1,25 @@
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from taiga.api_schemas import AssignmentDetail, AssignmentPage, Dashboard, Progress, UserProfile
+from taiga.api_schemas import (
+    AssignmentDetail,
+    AssignmentPage,
+    CompleteUploadRequest,
+    CreateReviewRequest,
+    CreateSubmissionRequest,
+    CreateUploadRequest,
+    Dashboard,
+    Progress,
+    ReviewQueuePage,
+    ReviewResponse,
+    SubmissionDetail,
+    SubmissionResponse,
+    UploadSessionResponse,
+    UserProfile,
+)
 from taiga.assignment_queries import (
     get_assignment,
     get_dashboard,
@@ -14,6 +29,15 @@ from taiga.assignment_queries import (
 from taiga.auth import Principal, get_current_principal
 from taiga.config import Settings, get_settings
 from taiga.infrastructure.database import database_ready, get_session
+from taiga.submission_service import (
+    complete_upload,
+    create_review,
+    create_submission,
+    create_upload,
+    get_submission_detail,
+    get_upload,
+    review_queue,
+)
 
 app = FastAPI(title="Project Taiga Local MVP", version="0.1.0")
 app.add_middleware(
@@ -99,3 +123,121 @@ def progress(
     session: Session = session_dependency,
 ) -> Progress:
     return get_progress(session, principal)
+
+
+@app.post(
+    "/api/v1/uploads/presign",
+    response_model=UploadSessionResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["submissions"],
+)
+def upload_presign(
+    request: CreateUploadRequest,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> UploadSessionResponse:
+    return create_upload(session, principal, request)
+
+
+@app.post(
+    "/api/v1/uploads/{upload_id}/complete",
+    response_model=UploadSessionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["submissions"],
+)
+def upload_complete(
+    upload_id: UUID,
+    request: CompleteUploadRequest,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> UploadSessionResponse:
+    try:
+        return complete_upload(session, principal, upload_id, request)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Upload not found") from exc
+
+
+@app.get("/api/v1/uploads/{upload_id}", response_model=UploadSessionResponse, tags=["submissions"])
+def upload_state(
+    upload_id: UUID,
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> UploadSessionResponse:
+    try:
+        return get_upload(session, principal, upload_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Upload not found") from exc
+
+
+@app.post(
+    "/api/v1/assignments/{assignment_id}/submissions",
+    response_model=SubmissionResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["submissions"],
+)
+def submit_assignment(
+    assignment_id: UUID,
+    request: CreateSubmissionRequest,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> SubmissionResponse:
+    try:
+        return create_submission(session, principal, assignment_id, request)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Assignment not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get(
+    "/api/v1/submissions/{submission_id}",
+    response_model=SubmissionDetail,
+    tags=["submissions"],
+)
+def submission_detail(
+    submission_id: UUID,
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> SubmissionDetail:
+    try:
+        return get_submission_detail(session, principal, submission_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Submission not found") from exc
+
+
+@app.get("/api/v1/reviews/queue", response_model=ReviewQueuePage, tags=["reviews"])
+def queue(
+    response: Response,
+    limit: int = 20,
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> ReviewQueuePage:
+    try:
+        return review_queue(session, principal, min(limit, 100))
+    except PermissionError as exc:
+        response.status_code = status.HTTP_403_FORBIDDEN
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@app.post(
+    "/api/v1/submissions/{submission_id}/reviews",
+    response_model=ReviewResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["reviews"],
+)
+def review_submission(
+    submission_id: UUID,
+    request: CreateReviewRequest,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> ReviewResponse:
+    try:
+        return create_review(session, principal, submission_id, request)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Submission not found") from exc

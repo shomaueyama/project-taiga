@@ -7,6 +7,7 @@ import {
   getHealth,
   getMe,
   getProgress,
+  getReviewQueue,
   getStoredLocalUser,
   setStoredLocalUser,
 } from "../shared/api/client";
@@ -18,6 +19,11 @@ export function App() {
   const dashboard = useQuery({ queryKey: ["dashboard", localUser], queryFn: getDashboard });
   const assignments = useQuery({ queryKey: ["assignments", localUser], queryFn: getAssignments });
   const progress = useQuery({ queryKey: ["progress", localUser], queryFn: getProgress });
+  const reviewQueue = useQuery({
+    queryKey: ["review-queue", localUser],
+    queryFn: getReviewQueue,
+    retry: false,
+  });
 
   function handleLocalUserChange(email: string) {
     setStoredLocalUser(email);
@@ -91,6 +97,13 @@ export function App() {
                 <time>{assignment.scheduledDate}</time>
               </article>
             ))}
+          </div>
+        </section>
+        <section className="panel">
+          <h2>Review</h2>
+          <div className="metric-row">
+            <span>Pending</span>
+            <strong>{reviewQueue.data?.items.length ?? 0}</strong>
           </div>
         </section>
       </section>

@@ -61,12 +61,36 @@ const progressSchema = z.object({
   rank: z.string().nullable(),
 });
 
+const uploadSessionSchema = z.object({
+  id: z.string(),
+  status: z.string(),
+  uploadUrl: z.string().nullable().optional(),
+  expiresAt: z.string(),
+  rejectionCode: z.string().nullable().optional(),
+});
+
+const submissionSchema = z.object({
+  id: z.string(),
+  assignmentId: z.string(),
+  version: z.number(),
+  status: z.string(),
+  createdAt: z.string(),
+});
+
+const reviewQueueSchema = z.object({
+  items: z.array(submissionSchema),
+  nextCursor: z.string().nullable(),
+});
+
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type AssignmentSummary = z.infer<typeof assignmentSummarySchema>;
 export type Dashboard = z.infer<typeof dashboardSchema>;
 export type AssignmentPage = z.infer<typeof assignmentPageSchema>;
 export type AssignmentDetail = z.infer<typeof assignmentDetailSchema>;
 export type Progress = z.infer<typeof progressSchema>;
+export type UploadSession = z.infer<typeof uploadSessionSchema>;
+export type Submission = z.infer<typeof submissionSchema>;
+export type ReviewQueue = z.infer<typeof reviewQueueSchema>;
 
 export function getStoredLocalUser(): string {
   return window.localStorage.getItem(authStorageKey) ?? "taiga@example.local";
@@ -79,6 +103,22 @@ export function setStoredLocalUser(email: string): void {
 async function apiGet<T>(path: string, schema: z.ZodType<T>): Promise<T> {
   const response = await fetch(`${apiBaseUrl}/api/v1${path}`, {
     headers: { Authorization: `Bearer local:${getStoredLocalUser()}` },
+  });
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status}`);
+  }
+  return schema.parse(await response.json());
+}
+
+async function apiPost<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
+  const response = await fetch(`${apiBaseUrl}/api/v1${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer local:${getStoredLocalUser()}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": crypto.randomUUID(),
+    },
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status}`);
@@ -112,4 +152,23 @@ export function getAssignment(id: string): Promise<AssignmentDetail> {
 
 export function getProgress(): Promise<Progress> {
   return apiGet("/progress", progressSchema);
+}
+
+export function getReviewQueue(): Promise<ReviewQueue> {
+  return apiGet("/reviews/queue", reviewQueueSchema);
+}
+
+export async function createDemoSubmission(assignmentId: string): Promise<Submission> {
+  const sha256 = "a".repeat(64);
+  const upload = await apiPost(
+    "/uploads/presign",
+    { originalName: "answer.md", mediaType: "text/markdown", sizeBytes: 10, sha256 },
+    uploadSessionSchema,
+  );
+  await apiPost(`/uploads/${upload.id}/complete`, { sizeBytes: 10, sha256 }, uploadSessionSchema);
+  return apiPost(
+    `/assignments/${assignmentId}/submissions`,
+    { sourceType: "file_upload", repositoryUrl: null, commitHash: null, uploadIds: [upload.id] },
+    submissionSchema,
+  );
 }
