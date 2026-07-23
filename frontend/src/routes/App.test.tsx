@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
@@ -23,7 +24,7 @@ function userForEmail(email: string) {
   if (email === "admin@example.local") {
     return {
       id: "00000000-0000-0000-0000-000000000011",
-      displayName: "Taiga Admin",
+      displayName: "上山 捷馬",
       role: "admin",
       status: "active",
       timezone: "Asia/Tokyo",
@@ -32,7 +33,7 @@ function userForEmail(email: string) {
   if (email === "reviewer@example.local") {
     return {
       id: "00000000-0000-0000-0000-000000000012",
-      displayName: "Taiga Reviewer",
+      displayName: "Local Reviewer",
       role: "reviewer",
       status: "active",
       timezone: "Asia/Tokyo",
@@ -40,7 +41,7 @@ function userForEmail(email: string) {
   }
   return {
     id: "00000000-0000-0000-0000-000000000013",
-    displayName: "Taiga Learner",
+    displayName: "上山 虎雅",
     role: "learner",
     status: "active",
     timezone: "Asia/Tokyo",
@@ -191,7 +192,9 @@ function renderApp() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <App />
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -206,44 +209,53 @@ describe("App", () => {
     installFetch();
     renderApp();
 
-    expect(screen.getByRole("heading", { name: "Project Taiga" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Local Login" })).toBeInTheDocument();
-    expect(await screen.findByText("ok")).toBeInTheDocument();
-    expect(await screen.findByText("Taiga Learner · learner")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Run submission" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Start exam" })).toBeDisabled();
-    expect(screen.getByText("Admin role required")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "ダッシュボード" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "ローカルログイン" })).toBeInTheDocument();
+    expect(await screen.findByText("正常")).toBeInTheDocument();
+    expect(await screen.findByText("上山 虎雅 · 学習者")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "実行確認" }));
+    expect(screen.getByRole("button", { name: "提出を実行確認する" })).toBeDisabled();
+    expect(screen.getByText("実行結果はまだありません。")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "試験" }));
+    expect(screen.getByRole("button", { name: "試験を開始" })).toBeDisabled();
+    expect(screen.getByText("試験結果はまだありません。")).toBeInTheDocument();
   });
 
   it("creates a demo submission and can run it when the runner is enabled", async () => {
     installFetch({ runnerEnabled: true });
     renderApp();
 
-    await screen.findByText("Taiga Learner · learner");
+    await screen.findByText("上山 虎雅 · 学習者");
+    fireEvent.click(screen.getByRole("link", { name: "課題" }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Submit demo answer" })).toBeEnabled(),
+      expect(screen.getByRole("button", { name: "デモ回答を提出" })).toBeEnabled(),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Submit demo answer" }));
+    fireEvent.click(screen.getByRole("button", { name: "デモ回答を提出" }));
 
-    expect(await screen.findByText(`Submission created: ${submissionId}`)).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole("button", { name: "Run submission" })).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", { name: "Run submission" }));
-    expect(await screen.findByText("succeeded")).toBeInTheDocument();
+    expect(await screen.findByText(`提出を作成しました: ${submissionId}`)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "実行確認" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "提出を実行確認する" })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "提出を実行確認する" }));
+    expect(await screen.findByText("完了")).toBeInTheDocument();
   });
 
   it("loads admin-only panels and reviews pending submissions", async () => {
     const { calls } = installFetch();
     renderApp();
 
-    fireEvent.change(await screen.findByLabelText("Local user"), {
+    fireEvent.change(await screen.findByLabelText("ローカル利用者"), {
       target: { value: "admin@example.local" },
     });
 
-    expect(await screen.findByText("Taiga Admin · admin")).toBeInTheDocument();
-    expect(await screen.findByText("published")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: `Request revision ${submissionId.slice(0, 8)}` }));
+    expect(await screen.findByText("上山 捷馬 · 管理者")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "管理" }));
+    expect(await screen.findByText("公開済み")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "レビュー" }));
+    fireEvent.click(screen.getByRole("button", { name: `${submissionId.slice(0, 8)}に修正依頼` }));
 
-    expect(await screen.findByText("needs_revision")).toBeInTheDocument();
+    expect(await screen.findByText("修正依頼")).toBeInTheDocument();
     expect(calls.find((call) => call.path.endsWith("/reviews"))?.body).toMatchObject({
       result: "needs_revision",
     });
@@ -253,9 +265,10 @@ describe("App", () => {
     installFetch({ examEnabled: true });
     renderApp();
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Start exam" })).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", { name: "Start exam" }));
+    fireEvent.click(await screen.findByRole("link", { name: "試験" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "試験を開始" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "試験を開始" }));
 
-    expect(await screen.findByText("oral_pending")).toBeInTheDocument();
+    expect(await screen.findByText("口頭確認待ち")).toBeInTheDocument();
   });
 });

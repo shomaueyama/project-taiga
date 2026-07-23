@@ -24,7 +24,7 @@ async function watchPage(page: import("@playwright/test").Page) {
 async function openLocalMvp(page: import("@playwright/test").Page) {
   const errors = await watchPage(page);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Project Taiga" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ダッシュボード" })).toBeVisible();
   return errors;
 }
 
@@ -67,31 +67,34 @@ test("learner can view dashboard, assignments, disabled runner, and disabled exa
   page,
 }) => {
   const errors = await openLocalMvp(page);
-  await page.getByLabel("Local user").selectOption("taiga@example.local");
+  await page.getByLabel("ローカル利用者").selectOption("taiga@example.local");
 
-  await expect(page.getByText("上山 虎雅 · learner")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Assignments" })).toBeVisible();
-  await expect(page.getByLabel("Assignment detail")).toContainText("Submissions:");
-  await expect(page.getByRole("button", { name: "Run submission" })).toBeDisabled();
-  await expect(page.getByText("Runner disabled locally")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start exam" })).toBeDisabled();
-  await expect(page.getByText("Exam disabled locally")).toBeVisible();
-  await expect(page.getByText("Admin role required")).toBeVisible();
+  await expect(page.getByText("上山 虎雅 · 学習者")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ダッシュボード" })).toBeVisible();
+  await page.getByRole("link", { name: "課題" }).click();
+  await expect(page.getByRole("heading", { name: "課題" })).toBeVisible();
+  await expect(page.getByLabel("課題詳細")).toContainText("提出履歴:");
+  await page.getByRole("link", { name: "実行確認" }).click();
+  await expect(page.getByRole("button", { name: "提出を実行確認する" })).toBeDisabled();
+  await expect(page.getByText("実行結果はまだありません。")).toBeVisible();
+  await page.getByRole("link", { name: "試験" }).click();
+  await expect(page.getByRole("button", { name: "試験を開始" })).toBeDisabled();
+  await expect(page.getByText("試験結果はまだありません。")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
 test("learner can create a local demo submission and retain state on reload", async ({ page }) => {
   const errors = await openLocalMvp(page);
-  await page.getByLabel("Local user").selectOption("taiga@example.local");
-  await page.getByRole("button", { name: "Submit demo answer" }).click();
-  await expect(page.getByText(/Submission created:/)).toBeVisible();
-  await expect(page.getByLabel("Assignment detail")).toContainText("Submissions:");
+  await page.getByLabel("ローカル利用者").selectOption("taiga@example.local");
+  await page.getByRole("link", { name: "課題" }).click();
+  await page.getByRole("button", { name: "デモ回答を提出" }).click();
+  await expect(page.getByText(/提出を作成しました:/)).toBeVisible();
+  await expect(page.getByLabel("課題詳細")).toContainText("提出履歴:");
   await page.waitForLoadState("networkidle");
 
   await page.reload();
-  await expect(page.getByText("上山 虎雅 · learner")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Assignments" })).toBeVisible();
+  await expect(page.getByText("上山 虎雅 · 学習者")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "課題" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -101,16 +104,18 @@ test("admin can view users, analytics, curriculum, flags, and review queue", asy
 }) => {
   const { submissionId } = await createLearnerSubmission(request);
   const errors = await openLocalMvp(page);
-  await page.getByLabel("Local user").selectOption("admin@example.local");
+  await page.getByLabel("ローカル利用者").selectOption("admin@example.local");
 
-  await expect(page.getByText("上山 捷馬 · admin")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
-  await expect(page.getByLabel("Feature flags")).toContainText("runner.enabled: disabled");
-  await expect(page.getByLabel("Feature flags")).toContainText("exam.enabled: disabled");
-  await expect(page.getByText("published")).toBeVisible();
+  await expect(page.getByText("上山 捷馬 · 管理者")).toBeVisible();
+  await page.getByRole("link", { name: "管理" }).click();
+  await expect(page.getByRole("heading", { name: "管理" })).toBeVisible();
+  await expect(page.getByLabel("機能フラグ")).toContainText("runner.enabled: 停止中");
+  await expect(page.getByLabel("機能フラグ")).toContainText("exam.enabled: 停止中");
+  await expect(page.getByText("公開済み")).toBeVisible();
 
-  await page.getByRole("button", { name: `Approve ${submissionId.slice(0, 8)}` }).click();
-  await expect(page.getByText("approved")).toBeVisible();
+  await page.getByRole("link", { name: "レビュー" }).click();
+  await page.getByRole("button", { name: `${submissionId.slice(0, 8)}を承認` }).click();
+  await expect(page.locator('[aria-live="polite"]').filter({ hasText: "承認済み" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -120,23 +125,25 @@ test("reviewer can request revision and admin can approve a resubmission", async
 }) => {
   const firstSubmission = await createLearnerSubmission(request);
   const errors = await openLocalMvp(page);
-  await page.getByLabel("Local user").selectOption("reviewer@example.local");
+  await page.getByLabel("ローカル利用者").selectOption("reviewer@example.local");
 
-  await expect(page.getByText("Local Reviewer · reviewer")).toBeVisible();
+  await expect(page.getByText("Local Reviewer · レビュアー")).toBeVisible();
+  await page.getByRole("link", { name: "レビュー" }).click();
   await page
-    .getByRole("button", { name: `Request revision ${firstSubmission.submissionId.slice(0, 8)}` })
+    .getByRole("button", { name: `${firstSubmission.submissionId.slice(0, 8)}に修正依頼` })
     .click();
-  await expect(page.getByText("needs_revision")).toBeVisible();
+  await expect(page.locator('[aria-live="polite"]').filter({ hasText: "修正依頼" })).toBeVisible();
 
   const secondSubmission = await createLearnerSubmission(request);
   expect(secondSubmission.assignmentId).toBe(firstSubmission.assignmentId);
 
-  await page.getByLabel("Local user").selectOption("admin@example.local");
-  await expect(page.getByText("上山 捷馬 · admin")).toBeVisible();
+  await page.getByLabel("ローカル利用者").selectOption("admin@example.local");
+  await expect(page.getByText("上山 捷馬 · 管理者")).toBeVisible();
+  await page.getByRole("link", { name: "レビュー" }).click();
   await page
-    .getByRole("button", { name: `Approve ${secondSubmission.submissionId.slice(0, 8)}` })
+    .getByRole("button", { name: `${secondSubmission.submissionId.slice(0, 8)}を承認` })
     .click();
-  await expect(page.getByText("approved")).toBeVisible();
+  await expect(page.locator('[aria-live="polite"]').filter({ hasText: "承認済み" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
