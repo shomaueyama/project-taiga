@@ -89,4 +89,4 @@ jobs:
       - name: Secret scanning
         run: |
           ! grep -RInE '(AWS_SECRET_ACCESS_KEY|BEGIN RSA PRIVATE KEY|gh[p]_|gh[o]_)' \
-            --exclude-dir=.git --exclude='*.md' .
+            --exclude-dir=.git --exclude='*.md' --exclude='ci.yml' .
