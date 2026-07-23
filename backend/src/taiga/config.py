@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     )
     runner_enabled: bool = Field(default=False, validation_alias="RUNNER_ENABLED")
     exam_enabled: bool = Field(default=False, validation_alias="EXAM_ENABLED")
+    rate_limit_enabled: bool = Field(default=True, validation_alias="RATE_LIMIT_ENABLED")
+    rate_limit_window_seconds: int = Field(default=60, validation_alias="RATE_LIMIT_WINDOW_SECONDS")
+    rate_limit_max_requests: int = Field(default=120, validation_alias="RATE_LIMIT_MAX_REQUESTS")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -31,6 +34,15 @@ class Settings(BaseSettings):
         if value and data.get("app_env") != "local":
             raise ValueError("LOCAL_AUTH_ENABLED can only be true when APP_ENV=local")
         return value
+
+    @field_validator("runner_enabled", "exam_enabled", "rate_limit_enabled", mode="before")
+    @classmethod
+    def security_flags_are_strict_bool(cls, value: object) -> object:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str) and value.lower() in {"true", "false"}:
+            return value
+        raise ValueError("Security-sensitive boolean flags must be true or false")
 
 
 @lru_cache

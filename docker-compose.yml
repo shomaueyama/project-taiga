@@ -63,7 +63,6 @@ services:
     volumes:
       - ./local-storage:/workspace/local-storage
       - ../design/taiga-42-v4.0-implementation-pack/curriculum:/workspace/curriculum:ro
-      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,7 +74,11 @@ services:
       RUNNER_ENABLED: ${RUNNER_ENABLED:-false}
     volumes:
       - ./local-storage:/workspace/local-storage:ro
-      - /var/run/docker.sock:/var/run/docker.sock
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
 volumes:
   postgres-data:

@@ -1,7 +1,11 @@
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class StrictRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
 
 class UserProfile(BaseModel):
@@ -28,16 +32,16 @@ class SubmissionSnapshot(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
-class CreateUploadRequest(BaseModel):
-    originalName: str
-    mediaType: str
-    sizeBytes: int
-    sha256: str
+class CreateUploadRequest(StrictRequest):
+    originalName: str = Field(min_length=1, max_length=255)
+    mediaType: str = Field(min_length=1, max_length=100)
+    sizeBytes: int = Field(ge=0, le=50 * 1024 * 1024 + 1)
+    sha256: str = Field(min_length=1, max_length=128)
 
 
-class CompleteUploadRequest(BaseModel):
-    sizeBytes: int
-    sha256: str
+class CompleteUploadRequest(StrictRequest):
+    sizeBytes: int = Field(ge=0, le=50 * 1024 * 1024 + 1)
+    sha256: str = Field(min_length=1, max_length=128)
 
 
 class UploadSessionResponse(BaseModel):
@@ -48,11 +52,11 @@ class UploadSessionResponse(BaseModel):
     rejectionCode: str | None = None
 
 
-class CreateSubmissionRequest(BaseModel):
+class CreateSubmissionRequest(StrictRequest):
     sourceType: Literal["public_git", "zip_upload", "file_upload"]
-    repositoryUrl: str | None = None
-    commitHash: str | None = None
-    uploadIds: list[UUID]
+    repositoryUrl: str | None = Field(default=None, max_length=2048)
+    commitHash: str | None = Field(default=None, max_length=128)
+    uploadIds: list[UUID] = Field(max_length=10)
 
 
 class SubmissionResponse(BaseModel):
@@ -69,8 +73,8 @@ class SubmissionDetail(BaseModel):
     sanitizedResult: dict[str, Any] | None = None
 
 
-class RunSubmissionRequest(BaseModel):
-    reason: str | None = None
+class RunSubmissionRequest(StrictRequest):
+    reason: str | None = Field(default=None, max_length=120)
 
 
 class RunnerJobResponse(BaseModel):
@@ -81,10 +85,10 @@ class RunnerJobResponse(BaseModel):
     sanitizedResult: dict[str, Any] | None
 
 
-class CreateReviewRequest(BaseModel):
+class CreateReviewRequest(StrictRequest):
     result: Literal["approved", "needs_revision"]
-    rubric: dict[str, Any]
-    comment: str
+    rubric: dict[str, Any] = Field(default_factory=dict)
+    comment: str = Field(min_length=1, max_length=2000)
 
 
 class ReviewResponse(BaseModel):
@@ -123,7 +127,7 @@ class ExamPage(BaseModel):
     nextCursor: str | None
 
 
-class CreateExamAttemptRequest(BaseModel):
+class CreateExamAttemptRequest(StrictRequest):
     pass
 
 
@@ -143,24 +147,24 @@ class ExamAttemptDetail(BaseModel):
     result: dict[str, Any] | None
 
 
-class StartExamRequest(BaseModel):
+class StartExamRequest(StrictRequest):
     acknowledgeRules: bool = True
 
 
-class SubmitExamRequest(BaseModel):
+class SubmitExamRequest(StrictRequest):
     submissionId: UUID | None = None
-    answers: dict[str, Any] = {}
+    answers: dict[str, Any] = Field(default_factory=dict)
 
 
-class OralAnswer(BaseModel):
-    question: str
-    assessment: str
-    note: str | None = None
+class OralAnswer(StrictRequest):
+    question: str = Field(min_length=1, max_length=500)
+    assessment: str = Field(min_length=1, max_length=500)
+    note: str | None = Field(default=None, max_length=1000)
 
 
-class OralReviewRequest(BaseModel):
+class OralReviewRequest(StrictRequest):
     passed: bool
-    answers: list[OralAnswer]
+    answers: list[OralAnswer] = Field(max_length=50)
 
 
 class Dashboard(BaseModel):
@@ -187,9 +191,9 @@ class PageUserProfile(BaseModel):
     nextCursor: str | None
 
 
-class InviteUserRequest(BaseModel):
-    email: str
-    displayName: str
+class InviteUserRequest(StrictRequest):
+    email: str = Field(min_length=3, max_length=255)
+    displayName: str = Field(min_length=1, max_length=120)
     role: Literal["learner", "reviewer", "admin"]
 
 
@@ -203,7 +207,7 @@ class FeatureFlagList(BaseModel):
     items: list[FeatureFlag]
 
 
-class UpdateFeatureFlagRequest(BaseModel):
+class UpdateFeatureFlagRequest(StrictRequest):
     enabled: bool
 
 

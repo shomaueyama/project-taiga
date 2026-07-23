@@ -10,9 +10,12 @@ from sqlalchemy.orm import Session
 from taiga.api_schemas import RunnerJobResponse, RunSubmissionRequest
 from taiga.auth import Principal
 from taiga.config import get_settings
-from taiga.errors import FeatureDisabledError
+from taiga.errors import ConflictError, FeatureDisabledError
 from taiga.state_transitions import runner_request_submission_status, runner_result_transition
 from taiga.submission_service import get_submission_summary
+
+RUNNER_REASON_FORBIDDEN_CHARS = frozenset(";&|`$<>(){}[]\\\n\r")
+OUTBOX_MAX_ATTEMPTS = 3
 
 
 def _json(value: object) -> str:
@@ -38,6 +41,14 @@ def queue_runner_job(
     settings = get_settings()
     if not settings.runner_enabled:
         raise FeatureDisabledError("Runner is disabled", code="runner_disabled")
+    if _request.reason and (
+        any(char in RUNNER_REASON_FORBIDDEN_CHARS for char in _request.reason)
+        or any(ord(char) < 32 for char in _request.reason)
+    ):
+        raise ConflictError(
+            "Runner request contains unsafe characters",
+            code="unsafe_runner_request",
+        )
     submission = get_submission_summary(session, principal, submission_id)
     existing = (
         session.execute(
@@ -119,9 +130,11 @@ def process_next_runner_job(session: Session) -> bool:
         session.execute(
             text(
                 """
-                SELECT id, aggregate_id
+                SELECT id, aggregate_id, attempt_count
                 FROM outbox_events
-                WHERE published_at IS NULL AND event_type = 'runner_job.queued'
+                WHERE published_at IS NULL
+                  AND event_type = 'runner_job.queued'
+                  AND next_attempt_at <= now()
                 ORDER BY next_attempt_at, created_at
                 LIMIT 1
                 FOR UPDATE SKIP LOCKED
@@ -133,6 +146,41 @@ def process_next_runner_job(session: Session) -> bool:
     )
     if event is None:
         return False
+    if event["attempt_count"] >= OUTBOX_MAX_ATTEMPTS:
+        session.execute(
+            text(
+                """
+                UPDATE outbox_events
+                SET last_error = 'poison runner job event exceeded retry limit',
+                    next_attempt_at = now() + interval '1 day'
+                WHERE id = :id
+                """
+            ),
+            {"id": event["id"]},
+        )
+        return True
+    job_exists = session.execute(
+        text("SELECT 1 FROM runner_jobs WHERE id = :id"),
+        {"id": event["aggregate_id"]},
+    ).scalar_one_or_none()
+    if job_exists is None:
+        session.execute(
+            text(
+                """
+                UPDATE outbox_events
+                SET attempt_count = attempt_count + 1,
+                    last_error = 'runner job aggregate not found',
+                    next_attempt_at = now() + interval '1 minute'
+                WHERE id = :id
+                """
+            ),
+            {"id": event["id"]},
+        )
+        return True
+    session.execute(
+        text("UPDATE outbox_events SET attempt_count = attempt_count + 1 WHERE id = :id"),
+        {"id": event["id"]},
+    )
     settings = get_settings()
     result = {
         "summary": "Runner is disabled; local job recorded without executing learner code.",

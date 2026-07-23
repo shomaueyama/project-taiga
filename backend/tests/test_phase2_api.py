@@ -55,6 +55,10 @@ def execute(query: str, params: dict[str, object] | None = None) -> None:
         session.execute(text(query), params or {})
 
 
+def delete_exam_attempt(attempt_id: str) -> None:
+    execute("DELETE FROM exam_attempts WHERE id = :id", {"id": UUID(attempt_id)})
+
+
 def create_submission(client: TestClient, assignment_id: str | None = None) -> dict[str, Any]:
     if assignment_id is None:
         assignments = client.get("/api/v1/assignments", headers=headers())
@@ -493,38 +497,41 @@ def test_exam_list_detail_expiry_and_unauthorized_oral_review(
     attempt = client.post(f"/api/v1/exams/{exam_id}/attempts", json={}, headers=headers())
     assert attempt.status_code == 201
     attempt_id = attempt.json()["id"]
-    detail = client.get(f"/api/v1/exam-attempts/{attempt_id}", headers=headers())
-    assert detail.status_code == 200
-    missing = client.get(f"/api/v1/exam-attempts/{uuid4()}", headers=headers())
-    assert missing.status_code == 404
-    started = client.post(
-        f"/api/v1/exam-attempts/{attempt_id}/start",
-        json={"acknowledgeRules": True},
-        headers=headers(),
-    )
-    assert started.json()["attempt"]["status"] == "in_progress"
-    execute(
-        """
-        UPDATE exam_attempts
-        SET starts_at = now() - interval '2 hours',
-            deadline_at = now() - interval '1 minute'
-        WHERE id = :id
-        """,
-        {"id": UUID(attempt_id)},
-    )
-    expired = client.post(
-        f"/api/v1/exam-attempts/{attempt_id}/submit",
-        json={"answers": {"q": "late"}},
-        headers=headers(),
-    )
-    assert expired.json()["attempt"]["status"] == "expired"
-    learner_oral = client.post(
-        f"/api/v1/exam-attempts/{attempt_id}/oral-review",
-        json={"passed": True, "answers": [{"question": "q", "assessment": "pass"}]},
-        headers=headers(),
-    )
-    assert learner_oral.status_code == 403
-    get_settings.cache_clear()
+    try:
+        detail = client.get(f"/api/v1/exam-attempts/{attempt_id}", headers=headers())
+        assert detail.status_code == 200
+        missing = client.get(f"/api/v1/exam-attempts/{uuid4()}", headers=headers())
+        assert missing.status_code == 404
+        started = client.post(
+            f"/api/v1/exam-attempts/{attempt_id}/start",
+            json={"acknowledgeRules": True},
+            headers=headers(),
+        )
+        assert started.json()["attempt"]["status"] == "in_progress"
+        execute(
+            """
+            UPDATE exam_attempts
+            SET starts_at = now() - interval '2 hours',
+                deadline_at = now() - interval '1 minute'
+            WHERE id = :id
+            """,
+            {"id": UUID(attempt_id)},
+        )
+        expired = client.post(
+            f"/api/v1/exam-attempts/{attempt_id}/submit",
+            json={"answers": {"q": "late"}},
+            headers=headers(),
+        )
+        assert expired.json()["attempt"]["status"] == "expired"
+        learner_oral = client.post(
+            f"/api/v1/exam-attempts/{attempt_id}/oral-review",
+            json={"passed": True, "answers": [{"question": "q", "assessment": "pass"}]},
+            headers=headers(),
+        )
+        assert learner_oral.status_code == 403
+    finally:
+        delete_exam_attempt(attempt_id)
+        get_settings.cache_clear()
 
 
 def test_validation_and_seed_entrypoints(seeded: None, capsys: pytest.CaptureFixture[str]) -> None:

@@ -109,6 +109,7 @@ Phase 0 baseline and planning records are in `docs/phase-0/README.md`.
 Phase 1 local MVP completion records are in `docs/phase-1/README.md`.
 Phase 2 coverage/reliability records are in `docs/phase-2/`.
 Phase 3 domain and architecture refactoring records are in `docs/phase-3/`.
+Phase 4 security hardening records are in `docs/phase-4/`.
 
 ## Feature Flags
 
@@ -117,6 +118,9 @@ Local safety defaults keep code execution and exams disabled:
 ```text
 RUNNER_ENABLED=false
 EXAM_ENABLED=false
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_WINDOW_SECONDS=60
+RATE_LIMIT_MAX_REQUESTS=120
 ```
 
 The frontend renders disabled states safely and does not expose hidden tests or production
@@ -124,7 +128,8 @@ credentials.
 
 When `RUNNER_ENABLED=false`, backend runner queue requests are rejected safely and no learner code is
 executed. When `EXAM_ENABLED=false`, exam mutation requests are rejected safely and the frontend does
-not start the exam flow.
+not start the exam flow. Rate limiting is local and in-process; production must replace it with a
+distributed control.
 
 ## Local Safety Defaults
 
@@ -132,8 +137,14 @@ not start the exam flow.
 - `LOCAL_AUTH_ENABLED=true`
 - `RUNNER_ENABLED=false`
 - `EXAM_ENABLED=false`
+- `RATE_LIMIT_ENABLED=true`
 
 AWS deployment and production connections are out of scope for the Local MVP.
+
+Local security hardening also includes explicit CORS methods and headers, response security headers,
+strict request schema validation, generated upload storage keys, Docker socket removal from worker
+services, and runner-controller container hardening. See `docs/phase-4/` for the threat model,
+attack surface inventory, test matrix, and deferred risks.
 
 ## Logs and Troubleshooting
 
