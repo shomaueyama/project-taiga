@@ -9,6 +9,23 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: taiga
+          POSTGRES_PASSWORD: taiga
+          POSTGRES_DB: taiga
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U taiga -d taiga"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://taiga:taiga@localhost:5432/taiga
+      CURRICULUM_SOURCE_DIR: ../design/taiga-42-v4.0-implementation-pack/curriculum
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -83,7 +100,7 @@ jobs:
         run: python -m taiga.validation
       - name: Migration validation
         working-directory: backend
-        run: alembic check
+        run: alembic upgrade head
       - name: Docker Compose config validation
         run: docker compose config --quiet
       - name: Secret scanning

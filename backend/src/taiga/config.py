@@ -15,6 +15,10 @@ class Settings(BaseSettings):
         default="/workspace/local-storage",
         validation_alias="LOCAL_STORAGE_ROOT",
     )
+    curriculum_source_dir: str = Field(
+        default="../design/taiga-42-v4.0-implementation-pack/curriculum",
+        validation_alias="CURRICULUM_SOURCE_DIR",
+    )
     runner_enabled: bool = Field(default=False, validation_alias="RUNNER_ENABLED")
     exam_enabled: bool = Field(default=False, validation_alias="EXAM_ENABLED")
 
