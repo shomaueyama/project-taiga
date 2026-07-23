@@ -207,6 +207,7 @@ def create_submission(
                 SELECT id
                 FROM task_assignments
                 WHERE id = :assignment_id AND learner_id = :learner_id
+                FOR UPDATE
                 """
             ),
             {"assignment_id": assignment_id, "learner_id": principal.id},
@@ -418,7 +419,7 @@ def review_queue(session: Session, principal: Principal, limit: int = 20) -> Rev
                 SELECT id, assignment_id, submission_version, status::text, created_at
                 FROM submissions
                 WHERE status = 'manual_review_pending'
-                ORDER BY created_at
+                ORDER BY created_at DESC
                 LIMIT :limit
                 """
             ),
@@ -439,6 +440,8 @@ def create_review(
     if principal.role not in {"reviewer", "admin"}:
         raise PermissionError("Reviewer role required")
     submission = get_submission_summary(session, principal, submission_id)
+    if submission.status != "manual_review_pending":
+        raise ValueError("Submission is not awaiting review")
     review_id = uuid.uuid4()
     session.execute(
         text(

@@ -16,6 +16,13 @@ The design pack is read-only. Application code, tests, migrations, and local doc
 - API: http://localhost:8000
 - API docs: http://localhost:8000/docs
 
+## Prerequisites
+
+- Docker and Docker Compose
+- Node.js/npm for local frontend tests
+- Python virtual environment at `.venv` for local backend commands
+- Read-only design pack at `../design/taiga-42-v4.0-implementation-pack`
+
 ## Core Commands
 
 ```bash
@@ -31,6 +38,22 @@ make test-e2e
 make validate
 make down
 ```
+
+## Clean Local Setup
+
+```bash
+make setup
+docker compose down -v
+docker compose build --no-cache
+docker compose up -d
+make migrate
+make seed
+make seed
+docker compose ps
+```
+
+The second `make seed` verifies idempotency. The backend and worker use the same backend
+Dockerfile. The canonical curriculum is mounted read-only from the design pack.
 
 ## Local Data
 
@@ -54,6 +77,15 @@ implementation pack and adds realistic Local MVP fixtures for:
 
 The design curriculum is mounted read-only into Docker at `/workspace/curriculum`.
 
+To reset local data:
+
+```bash
+make reset
+docker compose up -d
+make migrate
+make seed
+```
+
 ## Testing
 
 ```bash
@@ -64,6 +96,7 @@ make test-coverage
 cd frontend && npx playwright install
 make test-e2e
 cd frontend && npx playwright test --repeat-each=3
+cd frontend && npx playwright test --retries=2
 ```
 
 The current Local MVP test matrix is documented in
@@ -73,6 +106,7 @@ and unexpected HTTP 5xx responses.
 ## Baseline Planning
 
 Phase 0 baseline and planning records are in `docs/phase-0/README.md`.
+Phase 1 local MVP completion records are in `docs/phase-1/README.md`.
 
 ## Feature Flags
 
@@ -86,6 +120,10 @@ EXAM_ENABLED=false
 The frontend renders disabled states safely and does not expose hidden tests or production
 credentials.
 
+When `RUNNER_ENABLED=false`, backend runner queue requests are rejected safely and no learner code is
+executed. When `EXAM_ENABLED=false`, exam mutation requests are rejected safely and the frontend does
+not start the exam flow.
+
 ## Local Safety Defaults
 
 - `APP_ENV=local`
@@ -94,3 +132,17 @@ credentials.
 - `EXAM_ENABLED=false`
 
 AWS deployment and production connections are out of scope for the Local MVP.
+
+## Logs and Troubleshooting
+
+```bash
+docker compose ps
+docker compose logs --tail=200
+docker compose restart
+docker compose down
+docker compose up -d
+```
+
+If migration or seed fails, confirm PostgreSQL is healthy and the design pack path exists. If
+LocalAuth fails, confirm `.env` contains `APP_ENV=local` and `LOCAL_AUTH_ENABLED=true`. LocalAuth is
+intentionally rejected outside the local environment.

@@ -33,6 +33,9 @@ def queue_runner_job(
     submission_id: uuid.UUID,
     _request: RunSubmissionRequest,
 ) -> RunnerJobResponse:
+    settings = get_settings()
+    if not settings.runner_enabled:
+        raise PermissionError("Runner is disabled")
     submission = get_submission_summary(session, principal, submission_id)
     existing = (
         session.execute(
