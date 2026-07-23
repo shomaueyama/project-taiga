@@ -7,6 +7,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .venv/
+*.egg-info/
 node_modules/
 dist/
 coverage/
@@ -21,4 +22,3 @@ postgres-data/
 .DS_Store
 .idea/
 .vscode/
-
