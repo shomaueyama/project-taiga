@@ -82,6 +82,14 @@ const reviewQueueSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
+const runnerJobSchema = z.object({
+  id: z.string(),
+  submissionId: z.string(),
+  status: z.string(),
+  attempt: z.number(),
+  sanitizedResult: z.record(z.string(), z.unknown()).nullable(),
+});
+
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type AssignmentSummary = z.infer<typeof assignmentSummarySchema>;
 export type Dashboard = z.infer<typeof dashboardSchema>;
@@ -91,6 +99,7 @@ export type Progress = z.infer<typeof progressSchema>;
 export type UploadSession = z.infer<typeof uploadSessionSchema>;
 export type Submission = z.infer<typeof submissionSchema>;
 export type ReviewQueue = z.infer<typeof reviewQueueSchema>;
+export type RunnerJob = z.infer<typeof runnerJobSchema>;
 
 export function getStoredLocalUser(): string {
   return window.localStorage.getItem(authStorageKey) ?? "taiga@example.local";
@@ -171,4 +180,8 @@ export async function createDemoSubmission(assignmentId: string): Promise<Submis
     { sourceType: "file_upload", repositoryUrl: null, commitHash: null, uploadIds: [upload.id] },
     submissionSchema,
   );
+}
+
+export function runSubmission(submissionId: string): Promise<RunnerJob> {
+  return apiPost(`/submissions/${submissionId}/run`, { reason: "manual" }, runnerJobSchema);
 }

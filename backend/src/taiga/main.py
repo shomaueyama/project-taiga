@@ -15,6 +15,8 @@ from taiga.api_schemas import (
     Progress,
     ReviewQueuePage,
     ReviewResponse,
+    RunnerJobResponse,
+    RunSubmissionRequest,
     SubmissionDetail,
     SubmissionResponse,
     UploadSessionResponse,
@@ -29,6 +31,7 @@ from taiga.assignment_queries import (
 from taiga.auth import Principal, get_current_principal
 from taiga.config import Settings, get_settings
 from taiga.infrastructure.database import database_ready, get_session
+from taiga.runner_jobs import queue_runner_job
 from taiga.submission_service import (
     complete_upload,
     create_review,
@@ -239,5 +242,24 @@ def review_submission(
         return create_review(session, principal, submission_id, request)
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Submission not found") from exc
+
+
+@app.post(
+    "/api/v1/submissions/{submission_id}/run",
+    response_model=RunnerJobResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["runner"],
+)
+def run_submission(
+    submission_id: UUID,
+    request: RunSubmissionRequest,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> RunnerJobResponse:
+    try:
+        return queue_runner_job(session, principal, submission_id, request)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Submission not found") from exc

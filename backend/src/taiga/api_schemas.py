@@ -69,6 +69,18 @@ class SubmissionDetail(BaseModel):
     sanitizedResult: dict[str, Any] | None = None
 
 
+class RunSubmissionRequest(BaseModel):
+    reason: str | None = None
+
+
+class RunnerJobResponse(BaseModel):
+    id: UUID
+    submissionId: UUID
+    status: str
+    attempt: int
+    sanitizedResult: dict[str, Any] | None
+
+
 class CreateReviewRequest(BaseModel):
     result: Literal["approved", "needs_revision"]
     rubric: dict[str, Any]
