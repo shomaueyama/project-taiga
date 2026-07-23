@@ -1,6 +1,6 @@
 # Phase 1 Final Report
 
-Status: PASS locally, pending commit/push/CI at the time this file was updated.
+Status: PASS locally and PASS on GitHub Actions.
 
 ## Executive Summary
 
@@ -13,6 +13,9 @@ review E2E behavior, expanded backend integration tests, and README/Phase 1 docu
 - Branch: `feat/phase-1-local-mvp-completion`
 - Base: `docs/phase-0-baseline-and-planning`
 - Base rationale: includes PR #15 local seed/Playwright coverage and PR #16 Phase 0 baseline documentation.
+- Draft PR: https://github.com/shomaueyama/project-taiga/pull/17
+- Commits:
+  - `0f4e572 feat: complete phase 1 local MVP`
 
 ## Results
 
@@ -56,6 +59,7 @@ Detailed results are recorded in [test-results.md](test-results.md).
 | `git diff --check` | PASS |
 | Coverage reference | Backend 72%, frontend statements 53.71% |
 | Console/pageerror/5xx final findings | PASS, none in final sequential E2E |
+| GitHub Actions | PASS, backend/e2e/frontend/validation |
 
 ## Known Limitations
 
