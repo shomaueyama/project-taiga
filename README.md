@@ -16,6 +16,16 @@ The design pack is read-only. Application code, tests, migrations, and local doc
 - API: http://localhost:8000
 - API docs: http://localhost:8000/docs
 
+## Local Routes
+
+- `/dashboard`
+- `/assignments`
+- `/assignments/:assignmentId`
+- `/reviews`
+- `/runner`
+- `/exams`
+- `/admin`
+
 ## Prerequisites
 
 - Docker and Docker Compose
@@ -112,6 +122,7 @@ Phase 2 coverage/reliability records are in `docs/phase-2/`.
 Phase 3 domain and architecture refactoring records are in `docs/phase-3/`.
 Phase 4 security hardening records are in `docs/phase-4/`.
 Phase 5 performance and scalability records are in `docs/phase-5/`.
+Phase 6 UX, Japanese localization, accessibility, and responsive records are in `docs/phase-6/`.
 
 ## Feature Flags
 
