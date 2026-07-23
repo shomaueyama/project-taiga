@@ -24,6 +24,14 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = Field(default=True, validation_alias="RATE_LIMIT_ENABLED")
     rate_limit_window_seconds: int = Field(default=60, validation_alias="RATE_LIMIT_WINDOW_SECONDS")
     rate_limit_max_requests: int = Field(default=120, validation_alias="RATE_LIMIT_MAX_REQUESTS")
+    worker_idle_poll_seconds: float = Field(
+        default=5.0,
+        validation_alias="WORKER_IDLE_POLL_SECONDS",
+    )
+    worker_error_retry_seconds: float = Field(
+        default=30.0,
+        validation_alias="WORKER_ERROR_RETRY_SECONDS",
+    )
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

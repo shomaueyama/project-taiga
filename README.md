@@ -36,6 +36,7 @@ make test
 make test-coverage
 make test-e2e
 make validate
+python3 scripts/perf_load.py --scenario baseline
 make down
 ```
 
@@ -110,6 +111,7 @@ Phase 1 local MVP completion records are in `docs/phase-1/README.md`.
 Phase 2 coverage/reliability records are in `docs/phase-2/`.
 Phase 3 domain and architecture refactoring records are in `docs/phase-3/`.
 Phase 4 security hardening records are in `docs/phase-4/`.
+Phase 5 performance and scalability records are in `docs/phase-5/`.
 
 ## Feature Flags
 
@@ -121,6 +123,8 @@ EXAM_ENABLED=false
 RATE_LIMIT_ENABLED=true
 RATE_LIMIT_WINDOW_SECONDS=60
 RATE_LIMIT_MAX_REQUESTS=120
+WORKER_IDLE_POLL_SECONDS=5
+WORKER_ERROR_RETRY_SECONDS=30
 ```
 
 The frontend renders disabled states safely and does not expose hidden tests or production
@@ -145,6 +149,16 @@ Local security hardening also includes explicit CORS methods and headers, respon
 strict request schema validation, generated upload storage keys, Docker socket removal from worker
 services, and runner-controller container hardening. See `docs/phase-4/` for the threat model,
 attack surface inventory, test matrix, and deferred risks.
+
+Run the local read-path load test with:
+
+```bash
+python3 scripts/perf_load.py --scenario smoke
+python3 scripts/perf_load.py --scenario baseline
+python3 scripts/perf_load.py --scenario stress
+```
+
+The stress scenario is local-only and may intentionally hit API rate limits.
 
 ## Logs and Troubleshooting
 
