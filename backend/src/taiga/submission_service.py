@@ -388,10 +388,23 @@ def get_submission_detail(
         .mappings()
         .all()
     )
+    runner_result = session.execute(
+        text(
+            """
+            SELECT sanitized_result_json
+            FROM runner_jobs
+            WHERE submission_id = :submission_id
+              AND sanitized_result_json IS NOT NULL
+            ORDER BY attempt DESC
+            LIMIT 1
+            """
+        ),
+        {"submission_id": submission_id},
+    ).scalar_one_or_none()
     return SubmissionDetail(
         submission=submission,
         artifacts=[dict(row) for row in artifacts],
-        sanitizedResult=None,
+        sanitizedResult=runner_result,
     )
 
 
