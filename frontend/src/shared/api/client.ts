@@ -90,6 +90,18 @@ const runnerJobSchema = z.object({
   sanitizedResult: z.record(z.string(), z.unknown()).nullable(),
 });
 
+const examPageSchema = z.object({
+  items: z.array(
+    z.object({
+      id: z.string(),
+      stableCode: z.string(),
+      title: z.string(),
+      scheduledAt: z.string(),
+    }),
+  ),
+  nextCursor: z.string().nullable(),
+});
+
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type AssignmentSummary = z.infer<typeof assignmentSummarySchema>;
 export type Dashboard = z.infer<typeof dashboardSchema>;
@@ -100,6 +112,7 @@ export type UploadSession = z.infer<typeof uploadSessionSchema>;
 export type Submission = z.infer<typeof submissionSchema>;
 export type ReviewQueue = z.infer<typeof reviewQueueSchema>;
 export type RunnerJob = z.infer<typeof runnerJobSchema>;
+export type ExamPage = z.infer<typeof examPageSchema>;
 
 export function getStoredLocalUser(): string {
   return window.localStorage.getItem(authStorageKey) ?? "taiga@example.local";
@@ -184,4 +197,8 @@ export async function createDemoSubmission(assignmentId: string): Promise<Submis
 
 export function runSubmission(submissionId: string): Promise<RunnerJob> {
   return apiPost(`/submissions/${submissionId}/run`, { reason: "manual" }, runnerJobSchema);
+}
+
+export function getExams(): Promise<ExamPage> {
+  return apiGet("/exams", examPageSchema);
 }

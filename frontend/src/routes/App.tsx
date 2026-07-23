@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   getAssignments,
   getDashboard,
+  getExams,
   getHealth,
   getMe,
   getProgress,
@@ -24,6 +25,7 @@ export function App() {
     queryFn: getReviewQueue,
     retry: false,
   });
+  const exams = useQuery({ queryKey: ["exams", localUser], queryFn: getExams });
 
   function handleLocalUserChange(email: string) {
     setStoredLocalUser(email);
@@ -104,6 +106,13 @@ export function App() {
           <div className="metric-row">
             <span>Pending</span>
             <strong>{reviewQueue.data?.items.length ?? 0}</strong>
+          </div>
+        </section>
+        <section className="panel">
+          <h2>Exam</h2>
+          <div className="metric-row">
+            <span>Scheduled</span>
+            <strong>{exams.data?.items.length ?? 0}</strong>
           </div>
         </section>
       </section>
