@@ -60,7 +60,7 @@ async function createLearnerSubmission(request: import("@playwright/test").APIRe
     },
   });
   expect(submission.status()).toBe(201);
-  return (await submission.json()).id as string;
+  return { assignmentId, submissionId: (await submission.json()).id as string };
 }
 
 test("learner can view dashboard, assignments, disabled runner, and disabled exam", async ({
@@ -99,7 +99,7 @@ test("admin can view users, analytics, curriculum, flags, and review queue", asy
   page,
   request,
 }) => {
-  const submissionId = await createLearnerSubmission(request);
+  const { submissionId } = await createLearnerSubmission(request);
   const errors = await openLocalMvp(page);
   await page.getByLabel("Local user").selectOption("admin@example.local");
 
@@ -114,9 +114,57 @@ test("admin can view users, analytics, curriculum, flags, and review queue", asy
   expect(errors).toEqual([]);
 });
 
+test("reviewer can request revision and admin can approve a resubmission", async ({
+  page,
+  request,
+}) => {
+  const firstSubmission = await createLearnerSubmission(request);
+  const errors = await openLocalMvp(page);
+  await page.getByLabel("Local user").selectOption("reviewer@example.local");
+
+  await expect(page.getByText("Local Reviewer · reviewer")).toBeVisible();
+  await page
+    .getByRole("button", { name: `Request revision ${firstSubmission.submissionId.slice(0, 8)}` })
+    .click();
+  await expect(page.getByText("needs_revision")).toBeVisible();
+
+  const secondSubmission = await createLearnerSubmission(request);
+  expect(secondSubmission.assignmentId).toBe(firstSubmission.assignmentId);
+
+  await page.getByLabel("Local user").selectOption("admin@example.local");
+  await expect(page.getByText("上山 捷馬 · admin")).toBeVisible();
+  await page
+    .getByRole("button", { name: `Approve ${secondSubmission.submissionId.slice(0, 8)}` })
+    .click();
+  await expect(page.getByText("approved")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("unknown local user receives 401 from the API", async ({ request }) => {
   const response = await request.get("http://localhost:8000/api/v1/me", {
     headers: { Authorization: "Bearer local:missing@example.local" },
   });
   expect(response.status()).toBe(401);
+});
+
+test("disabled runner and exam mutations fail without mutating via the API", async ({ request }) => {
+  const authHeaders = { Authorization: "Bearer local:taiga@example.local" };
+  const { submissionId } = await createLearnerSubmission(request);
+
+  const runner = await request.post(`${apiBaseUrl}/submissions/${submissionId}/run`, {
+    headers: { ...authHeaders, "Idempotency-Key": crypto.randomUUID() },
+    data: { reason: "e2e-disabled-contract" },
+  });
+  expect(runner.status()).toBe(403);
+  expect(await runner.text()).not.toContain("traceback");
+
+  const exams = await request.get(`${apiBaseUrl}/exams`, { headers: authHeaders });
+  expect(exams.status()).toBe(200);
+  const examId = (await exams.json()).items[0].id;
+  const attempt = await request.post(`${apiBaseUrl}/exams/${examId}/attempts`, {
+    headers: { ...authHeaders, "Idempotency-Key": crypto.randomUUID() },
+    data: {},
+  });
+  expect(attempt.status()).toBe(403);
+  expect(await attempt.text()).not.toContain("traceback");
 });
