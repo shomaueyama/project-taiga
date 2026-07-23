@@ -70,6 +70,10 @@ The current Local MVP test matrix is documented in
 `docs/local-mvp-test-matrix.md`. Playwright monitors `pageerror`, `console.error`, failed requests,
 and unexpected HTTP 5xx responses.
 
+## Baseline Planning
+
+Phase 0 baseline and planning records are in `docs/phase-0/README.md`.
+
 ## Feature Flags
 
 Local safety defaults keep code execution and exams disabled:
