@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from alembic.config import Config
 from sqlalchemy import text
 
@@ -23,6 +24,8 @@ def scalar(query: str) -> int:
 def test_realistic_local_seed_is_idempotent() -> None:
     settings = get_settings()
     assert settings.app_env == "local"
+    if not (Path(settings.curriculum_source_dir) / "weeks.json").exists():
+        pytest.skip("Design curriculum is not present in this checkout")
 
     migrate()
     seed()

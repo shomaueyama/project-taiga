@@ -100,13 +100,15 @@ jobs:
         run: |
           if [ ! -f ../design/taiga-42-v4.0-implementation-pack/curriculum/weeks.json ]; then
             echo "Design pack is not present in this checkout; Playwright E2E skipped."
+            echo "SKIP_E2E=true" >> "$GITHUB_ENV"
             exit 0
           fi
+          echo "SKIP_E2E=false" >> "$GITHUB_ENV"
           docker compose up -d --build
           docker compose run --rm backend alembic upgrade head
           docker compose run --rm backend python -m taiga.seed
       - name: Playwright E2E
-        if: hashFiles('../design/taiga-42-v4.0-implementation-pack/curriculum/weeks.json') != ''
+        if: env.SKIP_E2E != 'true'
         working-directory: frontend
         run: npx playwright test
       - name: Upload Playwright artifacts
