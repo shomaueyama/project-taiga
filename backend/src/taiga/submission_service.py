@@ -25,6 +25,7 @@ from taiga.auth import Principal
 from taiga.config import get_settings
 
 ALLOWED_EXTENSIONS = {".c", ".h", ".md", ".txt", ".json", ".sh", ".png", ".jpg", ".jpeg", ".zip"}
+MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
 
 
 def _json(value: object) -> str:
@@ -65,7 +66,7 @@ def validate_upload_request(request: CreateUploadRequest) -> str | None:
         return "path_traversal"
     if _extension(request.originalName) not in ALLOWED_EXTENSIONS:
         return "extension_not_allowed"
-    if request.sizeBytes < 0 or request.sizeBytes > 50 * 1024 * 1024:
+    if request.sizeBytes < 0 or request.sizeBytes > MAX_UPLOAD_SIZE_BYTES:
         return "size_limit_exceeded"
     if not _is_sha256(request.sha256):
         return "invalid_sha256"
@@ -84,7 +85,10 @@ def create_upload(
     upload_id = uuid.uuid4()
     rejection_code = validate_upload_request(request)
     status = "rejected" if rejection_code else "created"
-    object_key = f"quarantine/{principal.id}/{upload_id}/{request.originalName}"
+    stored_original_name = request.originalName[:120]
+    stored_size_bytes = min(max(request.sizeBytes, 0), MAX_UPLOAD_SIZE_BYTES)
+    stored_sha256 = request.sha256 if _is_sha256(request.sha256) else "0" * 64
+    object_key = f"quarantine/{principal.id}/{upload_id}/{stored_original_name}"
     expires_at = datetime.now(UTC) + timedelta(minutes=15)
     session.execute(
         text(
@@ -103,10 +107,10 @@ def create_upload(
             "id": upload_id,
             "owner_id": principal.id,
             "object_key": object_key,
-            "original_name": request.originalName,
+            "original_name": stored_original_name,
             "declared_media_type": request.mediaType,
-            "declared_size_bytes": request.sizeBytes,
-            "declared_sha256": request.sha256,
+            "declared_size_bytes": stored_size_bytes,
+            "declared_sha256": stored_sha256,
             "scan_status": status,
             "rejection_code": rejection_code,
             "expires_at": expires_at,
@@ -439,7 +443,28 @@ def create_review(
 ) -> ReviewResponse:
     if principal.role not in {"reviewer", "admin"}:
         raise PermissionError("Reviewer role required")
-    submission = get_submission_summary(session, principal, submission_id)
+    submission_row = (
+        session.execute(
+            text(
+                """
+                SELECT id, assignment_id, submission_version, status::text, created_at
+                FROM submissions
+                WHERE id = :id AND (:is_reviewer OR learner_id = :learner_id)
+                FOR UPDATE
+                """
+            ),
+            {
+                "id": submission_id,
+                "learner_id": principal.id,
+                "is_reviewer": principal.role in {"reviewer", "admin"},
+            },
+        )
+        .mappings()
+        .first()
+    )
+    if submission_row is None:
+        raise LookupError("Submission not found")
+    submission = _submission(submission_row)
     if submission.status != "manual_review_pending":
         raise ValueError("Submission is not awaiting review")
     review_id = uuid.uuid4()
@@ -465,6 +490,17 @@ def create_review(
     session.execute(
         text("UPDATE submissions SET status = :status WHERE id = :id"),
         {"id": submission_id, "status": request.result},
+    )
+    assignment_status = "completed" if request.result == "approved" else "in_progress"
+    session.execute(
+        text(
+            """
+            UPDATE task_assignments
+            SET status = :status, updated_at = now(), version = version + 1
+            WHERE id = :assignment_id
+            """
+        ),
+        {"assignment_id": submission.assignmentId, "status": assignment_status},
     )
     session.execute(
         text(
