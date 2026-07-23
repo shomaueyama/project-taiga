@@ -12,7 +12,9 @@ body {
 .shell {
   min-height: 100vh;
   display: grid;
-  place-items: center;
+  align-content: start;
+  justify-items: center;
+  gap: 32px;
   padding: 32px;
   box-sizing: border-box;
 }
@@ -72,8 +74,67 @@ h1 {
   font-weight: 700;
 }
 
+.app-grid {
+  width: min(1160px, 100%);
+  display: grid;
+  grid-template-columns: 280px minmax(240px, 0.8fr) minmax(360px, 1.4fr);
+  gap: 16px;
+}
+
+.panel {
+  border: 1px solid #d9e2de;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 18px;
+  min-width: 0;
+}
+
+.panel h2 {
+  margin: 0 0 14px;
+  font-size: 1rem;
+}
+
+.login-panel select {
+  width: 100%;
+  min-height: 40px;
+}
+
+.metric-row,
+.assignment-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid #edf1ef;
+}
+
+.assignment-list {
+  display: grid;
+}
+
+.assignment-row div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.assignment-row strong {
+  overflow-wrap: anywhere;
+}
+
+.assignment-row span,
+.assignment-row time,
+.login-panel p {
+  color: #52615d;
+  font-size: 0.88rem;
+}
+
 @media (max-width: 720px) {
   .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .app-grid {
     grid-template-columns: 1fr;
   }
 
