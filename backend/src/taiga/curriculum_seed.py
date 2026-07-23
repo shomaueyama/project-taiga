@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from datetime import UTC, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +15,7 @@ from taiga.infrastructure.database import SessionLocal
 
 NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS, "project-taiga.local-mvp")
 CURRICULUM_VERSION = "v4.0-local-mvp"
+DEMO_SUBMISSION_SHA = "b" * 64
 
 
 def stable_uuid(scope: str, stable_id: str) -> uuid.UUID:
@@ -48,9 +49,9 @@ def json_text(value: object) -> str:
 
 def seed_local_users(session: Session) -> dict[str, uuid.UUID]:
     users = {
-        "taiga": ("taiga@example.local", "Taiga Learner", "learner"),
+        "taiga": ("taiga@example.local", "上山 虎雅", "learner"),
         "reviewer": ("reviewer@example.local", "Local Reviewer", "reviewer"),
-        "admin": ("admin@example.local", "Local Admin", "admin"),
+        "admin": ("admin@example.local", "上山 捷馬", "admin"),
     }
     result: dict[str, uuid.UUID] = {}
     for ref, (email, display_name, role) in users.items():
@@ -76,6 +77,344 @@ def seed_local_users(session: Session) -> dict[str, uuid.UUID]:
         )
         result[ref] = user_id
     return result
+
+
+def _upsert_submission(
+    session: Session,
+    assignment_id: uuid.UUID,
+    learner_id: uuid.UUID,
+    version: int,
+    status: str,
+    original_name: str,
+) -> uuid.UUID:
+    submission_id = stable_uuid("demo-submission", f"{assignment_id}:{version}")
+    artifact_key = f"accepted/{learner_id}/{submission_id}/{original_name}"
+    session.execute(
+        text(
+            """
+            INSERT INTO submissions (
+                id, assignment_id, learner_id, submission_version, source_type,
+                artifact_manifest_json, status
+            )
+            VALUES (
+                :id, :assignment_id, :learner_id, :submission_version, 'file_upload',
+                CAST(:artifact_manifest_json AS jsonb), :status
+            )
+            ON CONFLICT (assignment_id, submission_version) DO UPDATE
+            SET status = EXCLUDED.status,
+                artifact_manifest_json = EXCLUDED.artifact_manifest_json
+            """
+        ),
+        {
+            "id": submission_id,
+            "assignment_id": assignment_id,
+            "learner_id": learner_id,
+            "submission_version": version,
+            "status": status,
+            "artifact_manifest_json": json_text(
+                {"seed": "local-demo", "originalName": original_name}
+            ),
+        },
+    )
+    session.execute(
+        text(
+            """
+            INSERT INTO submission_artifacts (
+                id, submission_id, s3_key, sha256, media_type, size_bytes, original_name
+            )
+            VALUES (
+                :id, :submission_id, :s3_key, :sha256, 'text/markdown', 128, :original_name
+            )
+            ON CONFLICT (s3_key) DO UPDATE
+            SET sha256 = EXCLUDED.sha256,
+                media_type = EXCLUDED.media_type,
+                size_bytes = EXCLUDED.size_bytes,
+                original_name = EXCLUDED.original_name
+            """
+        ),
+        {
+            "id": stable_uuid("demo-artifact", artifact_key),
+            "submission_id": submission_id,
+            "s3_key": artifact_key,
+            "sha256": DEMO_SUBMISSION_SHA,
+            "original_name": original_name,
+        },
+    )
+    return submission_id
+
+
+def seed_realistic_local_state(session: Session, users: dict[str, uuid.UUID]) -> None:
+    settings = get_settings()
+    if settings.app_env != "local":
+        raise RuntimeError("Realistic local demo seed can only run when APP_ENV=local")
+
+    learner_id = users["taiga"]
+    admin_id = users["admin"]
+    today = date.today()
+    assignments = (
+        session.execute(
+            text(
+                """
+                SELECT a.id
+                FROM task_assignments a
+                JOIN task_templates t ON t.id = a.task_template_id
+                WHERE a.learner_id = :learner_id
+                ORDER BY t.stable_code
+                LIMIT 12
+                """
+            ),
+            {"learner_id": learner_id},
+        )
+        .scalars()
+        .all()
+    )
+    if len(assignments) < 8:
+        return
+
+    assignment_states = [
+        ("not_started", today + timedelta(days=3), True),
+        ("in_progress", today, True),
+        ("awaiting_submission", today - timedelta(days=1), True),
+        ("available", today + timedelta(days=1), False),
+        ("completed", today - timedelta(days=7), True),
+        ("missed", today - timedelta(days=10), True),
+        ("available", today + timedelta(days=14), True),
+        ("completed", today - timedelta(days=14), False),
+    ]
+    for assignment_id, (status, scheduled_date, required) in zip(
+        assignments, assignment_states, strict=False
+    ):
+        session.execute(
+            text(
+                """
+                UPDATE task_assignments
+                SET status = :status,
+                    scheduled_date = :scheduled_date,
+                    required = :required,
+                    updated_at = now(),
+                    version = version + 1
+                WHERE id = :id
+                """
+            ),
+            {
+                "id": assignment_id,
+                "status": status,
+                "scheduled_date": scheduled_date,
+                "required": required,
+            },
+        )
+
+    pending_submission = _upsert_submission(
+        session, assignments[2], learner_id, 1, "manual_review_pending", "python-print.md"
+    )
+    revision_submission_v1 = _upsert_submission(
+        session, assignments[1], learner_id, 1, "needs_revision", "typing-practice-v1.md"
+    )
+    revision_submission_v2 = _upsert_submission(
+        session, assignments[1], learner_id, 2, "manual_review_pending", "typing-practice-v2.md"
+    )
+    approved_submission = _upsert_submission(
+        session, assignments[4], learner_id, 1, "approved", "linux-basics.md"
+    )
+
+    reviews = [
+        (revision_submission_v1, "needs_revision", "Good effort. Add the requested edge cases."),
+        (approved_submission, "approved", "Approved. Clear explanation and reproducible output."),
+    ]
+    for submission_id, review_result, comment in reviews:
+        review_id = stable_uuid("demo-review", f"{submission_id}:{review_result}")
+        session.execute(
+            text(
+                """
+                INSERT INTO reviews (id, submission_id, reviewer_id, result, rubric_json, comment)
+                VALUES (
+                    :id, :submission_id, :reviewer_id, :result,
+                    CAST(:rubric_json AS jsonb), :comment
+                )
+                ON CONFLICT (id) DO UPDATE
+                SET result = EXCLUDED.result,
+                    rubric_json = EXCLUDED.rubric_json,
+                    comment = EXCLUDED.comment
+                """
+            ),
+            {
+                "id": review_id,
+                "submission_id": submission_id,
+                "reviewer_id": admin_id,
+                "result": review_result,
+                "rubric_json": json_text({"correctness": "ok", "readability": "ok"}),
+                "comment": comment,
+            },
+        )
+
+    runner_fixtures: list[tuple[uuid.UUID, int, str, dict[str, object] | None]] = [
+        (pending_submission, 1, "queued", None),
+        (revision_submission_v2, 1, "claimed", None),
+        (
+            approved_submission,
+            1,
+            "succeeded",
+            {"summary": "Public tests passed.", "hiddenTests": "redacted"},
+        ),
+        (
+            revision_submission_v1,
+            1,
+            "failed",
+            {"summary": "Public test failed.", "hiddenTests": "redacted"},
+        ),
+    ]
+    for submission_id, attempt, status, sanitized_result in runner_fixtures:
+        now = datetime.now(UTC)
+        started_at = now if status in {"claimed", "succeeded", "failed", "timed_out"} else None
+        finished_at = now if status in {"succeeded", "failed", "timed_out"} else None
+        session.execute(
+            text(
+                """
+                INSERT INTO runner_jobs (
+                    id, submission_id, status, attempt, image_digest,
+                    security_profile_version, started_at, finished_at, sanitized_result_json
+                )
+                VALUES (
+                    :id, :submission_id, CAST(:status AS runner_status), :attempt, 'local-demo',
+                    'RUNNER_SECURITY_V1', :started_at, :finished_at,
+                    CAST(:sanitized_result AS jsonb)
+                )
+                ON CONFLICT (submission_id, attempt) DO UPDATE
+                SET status = EXCLUDED.status,
+                    sanitized_result_json = EXCLUDED.sanitized_result_json,
+                    version = runner_jobs.version + 1
+                """
+            ),
+            {
+                "id": stable_uuid("demo-runner-job", f"{submission_id}:{attempt}"),
+                "submission_id": submission_id,
+                "status": status,
+                "attempt": attempt,
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "sanitized_result": json_text(sanitized_result) if sanitized_result else None,
+            },
+        )
+
+    exam_rows = (
+        session.execute(
+            text(
+                """
+                SELECT e.id AS exam_id, v.id AS variant_id, v.problem_snapshot_json
+                FROM exams e
+                JOIN exam_variants v ON v.exam_id = e.id
+                ORDER BY e.stable_code, v.stable_code
+                LIMIT 7
+                """
+            )
+        )
+        .mappings()
+        .all()
+    )
+    exam_statuses = ["ready", "in_progress", "oral_pending", "passed", "failed", "expired"]
+    for index, (row, status) in enumerate(zip(exam_rows, exam_statuses, strict=False), start=1):
+        now = datetime.now(UTC)
+        starts_at = (
+            now if status in {"in_progress", "oral_pending", "passed", "failed", "expired"} else None
+        )
+        deadline_at = None
+        if starts_at is not None:
+            if status == "expired":
+                starts_at = now - timedelta(minutes=90)
+                deadline_at = now - timedelta(minutes=30)
+            else:
+                deadline_at = now + timedelta(minutes=60)
+        submitted_at = now if status in {"oral_pending", "passed", "failed"} else None
+        session.execute(
+            text(
+                """
+                INSERT INTO exam_attempts (
+                    id, exam_id, exam_variant_id, learner_id, attempt_number, status,
+                    variant_snapshot_json, starts_at, deadline_at, submitted_at,
+                    oral_result_json, result_json
+                )
+                VALUES (
+                    :id, :exam_id, :exam_variant_id, :learner_id, :attempt_number, :status,
+                    CAST(:variant_snapshot_json AS jsonb), :starts_at, :deadline_at,
+                    :submitted_at, CAST(:oral_result_json AS jsonb), CAST(:result_json AS jsonb)
+                )
+                ON CONFLICT (exam_id, learner_id, attempt_number) DO UPDATE
+                SET status = EXCLUDED.status,
+                    variant_snapshot_json = EXCLUDED.variant_snapshot_json,
+                    starts_at = EXCLUDED.starts_at,
+                    deadline_at = EXCLUDED.deadline_at,
+                    submitted_at = EXCLUDED.submitted_at,
+                    oral_result_json = EXCLUDED.oral_result_json,
+                    result_json = EXCLUDED.result_json,
+                    version = exam_attempts.version + 1
+                """
+            ),
+            {
+                "id": stable_uuid("demo-exam-attempt", f"{row['exam_id']}:{index}"),
+                "exam_id": row["exam_id"],
+                "exam_variant_id": row["variant_id"],
+                "learner_id": learner_id,
+                "attempt_number": index,
+                "status": status,
+                "variant_snapshot_json": json_text(row["problem_snapshot_json"]),
+                "starts_at": starts_at,
+                "deadline_at": deadline_at,
+                "submitted_at": submitted_at,
+                "oral_result_json": json_text({"passed": status == "passed"})
+                if status in {"passed", "failed"}
+                else None,
+                "result_json": json_text({"seed": "local-demo", "status": status}),
+            },
+        )
+
+    for capability, level in {
+        "pc_basics": 2,
+        "typing": 3,
+        "python_basics": 2,
+        "linux_basics": 1,
+        "git_github": 1,
+    }.items():
+        session.execute(
+            text(
+                """
+                INSERT INTO capability_achievements (
+                    id, learner_id, capability_code, level, evidence_json, achieved_at
+                )
+                VALUES (
+                    :id, :learner_id, :capability_code, :level,
+                    CAST(:evidence_json AS jsonb), now()
+                )
+                ON CONFLICT (learner_id, capability_code, level) DO UPDATE
+                SET evidence_json = EXCLUDED.evidence_json,
+                    achieved_at = EXCLUDED.achieved_at
+                """
+            ),
+            {
+                "id": stable_uuid("demo-capability", f"{learner_id}:{capability}:{level}"),
+                "learner_id": learner_id,
+                "capability_code": capability,
+                "level": level,
+                "evidence_json": json_text([{"source": "local-demo-seed"}]),
+            },
+        )
+
+    session.execute(
+        text(
+            """
+            INSERT INTO rank_history (id, learner_id, rank_code, evidence_snapshot_json, achieved_at)
+            VALUES (:id, :learner_id, 'local-foundation', CAST(:evidence AS jsonb), now())
+            ON CONFLICT (id) DO UPDATE
+            SET rank_code = EXCLUDED.rank_code,
+                evidence_snapshot_json = EXCLUDED.evidence_snapshot_json,
+                achieved_at = EXCLUDED.achieved_at
+            """
+        ),
+        {
+            "id": stable_uuid("demo-rank", str(learner_id)),
+            "learner_id": learner_id,
+            "evidence": json_text({"source": "local-demo-seed"}),
+        },
+    )
 
 
 def seed_curriculum(session: Session, source_dir: Path, storage_root: Path) -> None:
@@ -315,6 +654,7 @@ def seed_curriculum(session: Session, source_dir: Path, storage_root: Path) -> N
                 "updated_by": admin_id,
             },
         )
+    seed_realistic_local_state(session, users)
 
 
 def seed() -> None:

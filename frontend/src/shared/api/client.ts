@@ -82,6 +82,13 @@ const reviewQueueSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
+const reviewSchema = z.object({
+  id: z.string(),
+  result: z.string(),
+  comment: z.string(),
+  createdAt: z.string(),
+});
+
 const runnerJobSchema = z.object({
   id: z.string(),
   submissionId: z.string(),
@@ -102,6 +109,51 @@ const examPageSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
+const examAttemptSchema = z.object({
+  id: z.string(),
+  examId: z.string(),
+  status: z.string(),
+  attemptNumber: z.number(),
+});
+
+const examAttemptDetailSchema = z.object({
+  attempt: examAttemptSchema,
+  variantSnapshot: z.record(z.string(), z.unknown()),
+  startsAt: z.string().nullable(),
+  deadlineAt: z.string().nullable(),
+  submittedAt: z.string().nullable(),
+  result: z.record(z.string(), z.unknown()).nullable(),
+});
+
+const userPageSchema = z.object({
+  items: z.array(userProfileSchema),
+  nextCursor: z.string().nullable(),
+});
+
+const featureFlagListSchema = z.object({
+  items: z.array(z.object({ key: z.string(), enabled: z.boolean(), version: z.number() })),
+});
+
+const analyticsSchema = z.object({
+  learners: z.number(),
+  submissions: z.number(),
+  approvedSubmissions: z.number(),
+  examAttempts: z.number(),
+  passedExamAttempts: z.number(),
+});
+
+const curriculumVersionPageSchema = z.object({
+  items: z.array(
+    z.object({
+      id: z.string(),
+      version: z.string(),
+      status: z.string(),
+      contentHash: z.string(),
+    }),
+  ),
+  nextCursor: z.string().nullable(),
+});
+
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type AssignmentSummary = z.infer<typeof assignmentSummarySchema>;
 export type Dashboard = z.infer<typeof dashboardSchema>;
@@ -111,8 +163,15 @@ export type Progress = z.infer<typeof progressSchema>;
 export type UploadSession = z.infer<typeof uploadSessionSchema>;
 export type Submission = z.infer<typeof submissionSchema>;
 export type ReviewQueue = z.infer<typeof reviewQueueSchema>;
+export type Review = z.infer<typeof reviewSchema>;
 export type RunnerJob = z.infer<typeof runnerJobSchema>;
 export type ExamPage = z.infer<typeof examPageSchema>;
+export type ExamAttempt = z.infer<typeof examAttemptSchema>;
+export type ExamAttemptDetail = z.infer<typeof examAttemptDetailSchema>;
+export type UserPage = z.infer<typeof userPageSchema>;
+export type FeatureFlagList = z.infer<typeof featureFlagListSchema>;
+export type Analytics = z.infer<typeof analyticsSchema>;
+export type CurriculumVersionPage = z.infer<typeof curriculumVersionPageSchema>;
 
 export function getStoredLocalUser(): string {
   return window.localStorage.getItem(authStorageKey) ?? "taiga@example.local";
@@ -201,4 +260,54 @@ export function runSubmission(submissionId: string): Promise<RunnerJob> {
 
 export function getExams(): Promise<ExamPage> {
   return apiGet("/exams", examPageSchema);
+}
+
+export function reviewSubmission(
+  submissionId: string,
+  result: "approved" | "needs_revision",
+): Promise<Review> {
+  return apiPost(
+    `/submissions/${submissionId}/reviews`,
+    {
+      result,
+      rubric: { correctness: "checked", clarity: "checked" },
+      comment:
+        result === "approved"
+          ? "Approved from local MVP review."
+          : "Please revise the answer and resubmit.",
+    },
+    reviewSchema,
+  );
+}
+
+export function createExamAttempt(examId: string): Promise<ExamAttempt> {
+  return apiPost(`/exams/${examId}/attempts`, {}, examAttemptSchema);
+}
+
+export function startExamAttempt(attemptId: string): Promise<ExamAttemptDetail> {
+  return apiPost(`/exam-attempts/${attemptId}/start`, { acknowledgeRules: true }, examAttemptDetailSchema);
+}
+
+export function submitExamAttempt(attemptId: string): Promise<ExamAttemptDetail> {
+  return apiPost(
+    `/exam-attempts/${attemptId}/submit`,
+    { answers: { q1: "local MVP answer" }, submissionId: null },
+    examAttemptDetailSchema,
+  );
+}
+
+export function getAdminUsers(): Promise<UserPage> {
+  return apiGet("/admin/users", userPageSchema);
+}
+
+export function getFeatureFlags(): Promise<FeatureFlagList> {
+  return apiGet("/admin/feature-flags", featureFlagListSchema);
+}
+
+export function getAnalytics(): Promise<Analytics> {
+  return apiGet("/admin/analytics/learning", analyticsSchema);
+}
+
+export function getCurriculumVersions(): Promise<CurriculumVersionPage> {
+  return apiGet("/admin/curriculum/versions", curriculumVersionPageSchema);
 }
