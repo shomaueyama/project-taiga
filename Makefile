@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: setup up down logs migrate seed lint typecheck test test-backend test-frontend test-coverage test-e2e validate reset
+.PHONY: setup up down logs migrate seed lint typecheck test test-backend test-frontend test-coverage test-e2e validate terraform-fmt terraform-validate reset
 
 setup:
 	cp -n .env.example .env || true
@@ -46,6 +46,23 @@ test-e2e:
 validate:
 	$(COMPOSE) config --quiet
 	cd backend && ../.venv/bin/python -m taiga.validation
+	$(MAKE) terraform-validate
+
+terraform-fmt:
+	@if command -v terraform >/dev/null 2>&1; then \
+		terraform fmt -check -recursive infra; \
+	else \
+		echo "terraform not installed; skipping local terraform fmt"; \
+	fi
+
+terraform-validate: terraform-fmt
+	@if command -v terraform >/dev/null 2>&1; then \
+		for env in staging production; do \
+			(cd infra/environments/$$env && terraform init -backend=false && terraform validate); \
+		done; \
+	else \
+		echo "terraform not installed; skipping local terraform validate"; \
+	fi
 
 reset:
 	$(COMPOSE) down -v
