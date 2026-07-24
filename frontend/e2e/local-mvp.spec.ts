@@ -2,6 +2,9 @@ import { expect, test } from "@playwright/test";
 
 const apiBaseUrl = "http://localhost:8000/api/v1";
 
+test.describe.configure({ mode: "serial" });
+test.skip(({ browserName }) => browserName !== "chromium", "Stateful Local MVP flows run in Chromium; cross-browser coverage lives in accessibility-responsive.spec.ts.");
+
 async function watchPage(page: import("@playwright/test").Page) {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));

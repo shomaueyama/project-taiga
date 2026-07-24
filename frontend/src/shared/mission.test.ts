@@ -26,11 +26,31 @@ describe("Mission Progress", () => {
   it("handles boundaries and missing authoritative data", () => {
     expect(calculateMissionProgress(100)).toMatchObject({ completed: 28, percentage: 100 });
     expect(calculateMissionProgress(-4)).toMatchObject({ completed: 0, percentage: 0 });
+    expect(calculateMissionProgress(0.2)).toMatchObject({ completed: 0, percentage: 0 });
+    expect(calculateMissionProgress(1)).toMatchObject({ completed: 1, percentage: 4 });
+    expect(calculateMissionProgress(14)).toMatchObject({ completed: 14, percentage: 50 });
+    expect(calculateMissionProgress(27.4)).toMatchObject({ completed: 27, percentage: 96 });
+    expect(calculateMissionProgress(27.6)).toMatchObject({ completed: 28, percentage: 100 });
     expect(calculateMissionProgress(undefined)).toMatchObject({
       completed: null,
       percentage: null,
       scheduleStatus: "unknown",
       imageSrc: null,
+    });
+    expect(calculateMissionProgress(Number.NaN)).toMatchObject({ scheduleStatus: "unknown" });
+    expect(calculateMissionProgress(Number.POSITIVE_INFINITY)).toMatchObject({
+      scheduleStatus: "unknown",
+    });
+    expect(calculateMissionProgress(4, { totalWeeks: 0 })).toMatchObject({
+      completed: null,
+      total: 0,
+      percentage: null,
+      scheduleStatus: "unknown",
+    });
+    expect(calculateMissionProgress(9, { totalWeeks: 8 })).toMatchObject({
+      completed: 8,
+      total: 8,
+      percentage: 100,
     });
   });
 });

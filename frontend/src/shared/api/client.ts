@@ -56,7 +56,7 @@ const assignmentDetailSchema = z.object({
 });
 
 const progressSchema = z.object({
-  completedWeeks: z.number(),
+  completedWeeks: z.number().nullable().optional(),
   capabilities: z.array(z.object({ code: z.string(), level: z.number() })),
   rank: z.string().nullable(),
 });

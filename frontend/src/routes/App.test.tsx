@@ -54,7 +54,12 @@ function localUserFrom(init?: RequestInit) {
 }
 
 function installFetch(
-  options: { runnerEnabled?: boolean; examEnabled?: boolean; todayAssignment?: boolean } = {},
+  options: {
+    runnerEnabled?: boolean;
+    examEnabled?: boolean;
+    todayAssignment?: boolean;
+    completedWeeks?: number | null;
+  } = {},
 ) {
   const calls: Array<{ path: string; method: string; body: unknown }> = [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -141,7 +146,7 @@ function installFetch(
       return response({ id: reviewId, status: "accepted", expiresAt: now }, 202);
     }
     if (path === "/api/v1/progress") {
-      return response({ completedWeeks: 0, capabilities: [], rank: null });
+      return response({ completedWeeks: options.completedWeeks ?? 0, capabilities: [], rank: null });
     }
     if (path === "/api/v1/reviews/queue") {
       return response({
@@ -201,7 +206,29 @@ function installFetch(
   return { calls, fetchMock };
 }
 
+function stubMatchMedia(matches = false) {
+  const matchMedia = (query: string) => ({
+    matches,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  });
+  vi.stubGlobal("matchMedia", matchMedia);
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: matchMedia,
+  });
+}
+
 function renderApp(initialEntries = ["/"]) {
+  if (typeof window.matchMedia !== "function") {
+    stubMatchMedia(false);
+  }
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -215,6 +242,7 @@ function renderApp(initialEntries = ["/"]) {
 describe("App", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    stubMatchMedia(false);
     localStorage.clear();
   });
 
@@ -225,11 +253,11 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "ダッシュボード" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "ローカルログイン" })).toBeInTheDocument();
     expect(screen.getAllByText("TAIGA NOVA").length).toBeGreaterThan(0);
+    expect(await screen.findByText("予定より遅れています")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "学習進捗" })).toHaveAttribute(
       "aria-valuenow",
       "0",
     );
-    expect(await screen.findByText("予定より遅れています")).toBeInTheDocument();
     expect(await screen.findByText("正常")).toBeInTheDocument();
     expect(await screen.findByText("上山 虎雅 · 学習者")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "実行環境" }));
@@ -261,6 +289,7 @@ describe("App", () => {
   });
 
   it("renders populated dashboard rows, opens assignment detail, and handles mobile drawer", async () => {
+    stubMatchMedia(true);
     installFetch({ todayAssignment: true });
     renderApp();
 
@@ -270,15 +299,35 @@ describe("App", () => {
       "aria-expanded",
       "true",
     );
+    expect(screen.getByRole("link", { name: "ダッシュボード" })).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(screen.getByLabelText("ローカル利用者")).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(screen.getByRole("link", { name: "ダッシュボード" })).toHaveFocus();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.getByRole("button", { name: "ナビゲーションを開く" })).toHaveAttribute(
       "aria-expanded",
       "false",
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "ナビゲーションを開く" }));
     fireEvent.click(screen.getByRole("link", { name: "課題" }));
     fireEvent.click(await screen.findByRole("button", { name: "詳細を開く" }));
     expect(screen.getByLabelText("課題詳細")).toHaveTextContent("Typing basics");
+  });
+
+  it("renders a neutral unknown mission progress state", async () => {
+    installFetch({ completedWeeks: null });
+    renderApp();
+
+    expect(await screen.findByText("進捗状況を判定できません")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "学習進捗" })).not.toHaveAttribute(
+      "aria-valuenow",
+    );
+    expect(screen.getByRole("progressbar", { name: "学習進捗" })).toHaveAttribute(
+      "aria-valuetext",
+      "進捗は未判定です",
+    );
   });
 
   it("renders the TAIGA NOVA off-orbit not found route", async () => {

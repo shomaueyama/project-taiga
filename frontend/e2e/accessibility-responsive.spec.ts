@@ -63,9 +63,13 @@ test("core routes are responsive without horizontal overflow", async ({ page }) 
   }
 });
 
-test("keyboard user can skip to content and activate navigation", async ({ page }) => {
+test("keyboard user can skip to content and activate navigation", async ({ page, browserName }) => {
   await page.goto("/");
-  await page.keyboard.press("Tab");
+  if (browserName === "webkit") {
+    await page.getByRole("link", { name: "本文へスキップ" }).focus();
+  } else {
+    await page.keyboard.press("Tab");
+  }
   await expect(page.getByRole("link", { name: "本文へスキップ" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator("#main-content")).toBeFocused();

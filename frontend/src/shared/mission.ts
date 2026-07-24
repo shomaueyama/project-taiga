@@ -1,6 +1,6 @@
-import taigaAhead from "../assets/taiga-status/taiga-status-ahead.png";
-import taigaBehind from "../assets/taiga-status/taiga-status-behind.png";
-import taigaOnSchedule from "../assets/taiga-status/taiga-status-on-schedule.png";
+import taigaAhead from "../assets/taiga-status/taiga-status-ahead.webp";
+import taigaBehind from "../assets/taiga-status/taiga-status-behind.webp";
+import taigaOnSchedule from "../assets/taiga-status/taiga-status-on-schedule.webp";
 
 export type ScheduleStatus = "ahead" | "on_schedule" | "behind" | "unknown";
 
@@ -37,11 +37,21 @@ const statusImages: Record<Exclude<ScheduleStatus, "unknown">, { src: string; al
   behind: { src: taigaBehind, alt: "予定より遅れている状態" },
 };
 
-export function calculateMissionProgress(completedWeeks?: number | null): MissionProgress {
-  if (completedWeeks === null || completedWeeks === undefined || Number.isNaN(completedWeeks)) {
+export function calculateMissionProgress(
+  completedWeeks?: number | null,
+  options: { totalWeeks?: number } = {},
+): MissionProgress {
+  const missionTotal = options.totalWeeks ?? totalWeeks;
+  if (
+    completedWeeks === null ||
+    completedWeeks === undefined ||
+    Number.isNaN(completedWeeks) ||
+    !Number.isFinite(completedWeeks) ||
+    missionTotal <= 0
+  ) {
     return {
       completed: null,
-      total: totalWeeks,
+      total: Math.max(missionTotal, 0),
       percentage: null,
       scheduleStatus: "unknown",
       label: scheduleStatusLabels.unknown,
@@ -51,14 +61,14 @@ export function calculateMissionProgress(completedWeeks?: number | null): Missio
     };
   }
 
-  const completed = Math.min(Math.max(Math.round(completedWeeks), 0), totalWeeks);
-  const percentage = Math.round((completed / totalWeeks) * 100);
+  const completed = Math.min(Math.max(Math.round(completedWeeks), 0), missionTotal);
+  const percentage = Math.round((completed / missionTotal) * 100);
   const scheduleStatus = resolveScheduleStatus(completed);
   const image = statusImages[scheduleStatus];
 
   return {
     completed,
-    total: totalWeeks,
+    total: missionTotal,
     percentage,
     scheduleStatus,
     label: scheduleStatusLabels[scheduleStatus],
