@@ -1,0 +1,17 @@
+aws_region        = "ap-northeast-1"
+github_repository = "OWNER/project-taiga"
+github_oidc_provider_arn = "arn:aws:iam::ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
+
+# Replace after ACM/Route53 are prepared. CloudFront certificates must be in us-east-1.
+certificate_arn            = null
+cloudfront_certificate_arn = null
+route53_zone_id            = null
+frontend_domain_name       = null
+api_domain_name            = null
+
+# Replace with immutable image digests from ECR during deployment.
+backend_image = "ACCOUNT_ID.dkr.ecr.ap-northeast-1.amazonaws.com/taiga-staging/backend@sha256:REPLACE_ME"
+worker_image  = "ACCOUNT_ID.dkr.ecr.ap-northeast-1.amazonaws.com/taiga-staging/worker@sha256:REPLACE_ME"
+
+# Supply via CI/environment variable TF_VAR_database_url_parameter_value.
+database_url_parameter_value = "REPLACE_AT_DEPLOY_TIME"
