@@ -24,7 +24,7 @@ Confirm no secrets are tracked.
 2. Create/select the production database.
 3. Store the connection string securely.
 4. Add `sslmode=require` if Neon does not include it.
-5. Configure Render `DATABASE_URL`.
+5. Configure Render `DATABASE_URL` and `MIGRATION_DATABASE_URL`.
 6. Run:
 
 ```bash
@@ -41,13 +41,13 @@ Do not paste real credentials into committed files.
 2. Use root directory `backend`.
 3. Use build command `pip install -e ".[dev]"`.
 4. Use start command `uvicorn taiga.main:app --host 0.0.0.0 --port $PORT`.
-5. Configure health check `/health`.
+5. Configure health check `/api/health`.
 6. Configure environment variables listed in `docs/deployment/cloudflare-render-neon.md`.
 7. Deploy after owner approval.
 8. Verify:
 
 ```text
-https://<render-service>.onrender.com/health
+https://api.taiganova.app/api/health
 ```
 
 ## Step 4: Cloudflare Pages
@@ -57,16 +57,17 @@ https://<render-service>.onrender.com/health
 3. Root directory: `frontend`.
 4. Build command: `npm install && npm run build`.
 5. Output directory: `dist`.
-6. Set `VITE_API_BASE_URL` to the HTTPS Render backend origin.
+6. Set `VITE_API_BASE_URL=https://api.taiganova.app`.
 7. Deploy after owner approval.
 8. Verify nested routes such as `/dashboard` and `/assignments`.
 
 ## Step 5: CORS And Authentication
 
-1. Add the final Cloudflare origin to Render `FRONTEND_ORIGINS`.
+1. Set Render `FRONTEND_ORIGINS=https://app.taiganova.app`.
 2. Confirm no wildcard CORS is configured.
-3. Select and implement production authentication before exposing authenticated flows.
-4. Verify authenticated API calls from the deployed frontend.
+3. Protect both `app.taiganova.app` and `api.taiganova.app` with Cloudflare Access.
+4. Configure Render Cloudflare Access variables through secret fields.
+5. Verify authenticated API calls from the deployed frontend.
 
 ## Step 6: Two-User Acceptance Test
 
@@ -86,3 +87,6 @@ https://<render-service>.onrender.com/health
 - Record Alembic migration version.
 - Confirm Neon backup/export path.
 
+## Phase 7.4 Launch
+
+Use `docs/deployment/production-launch.md` for the gated `taiganova.app` launch sequence.

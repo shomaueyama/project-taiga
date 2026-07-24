@@ -129,6 +129,10 @@ Phase 7 production infrastructure records are in `docs/phase-7/` and `infra/`.
 Phase 7.1 Cloudflare-native assessment records are in `docs/phase-7-cloudflare/`.
 Phase 7.2 free two-user deployment records are in `docs/phase-7-2/` and
 `docs/deployment/cloudflare-render-neon.md`.
+Phase 7.3 production Cloudflare Access controls are in `docs/phase-7-3/` and
+`docs/security/cloudflare-access.md`.
+Phase 7.4 gated production launch planning for `taiganova.app` is in `docs/phase-7-4/` and
+`docs/deployment/production-launch.md`.
 
 ## Production Infrastructure
 
@@ -173,6 +177,11 @@ distributed control.
 - `RATE_LIMIT_ENABLED=true`
 
 AWS deployment and production connections are out of scope for the Local MVP.
+
+The approved Phase 7.4 production topology uses Cloudflare Pages, Render Free, Neon Free, and
+Cloudflare Access for exactly two users. Production launch remains gated: do not purchase domains,
+create external resources, push branches, run production migrations, or deploy until the owner
+approves the corresponding Phase 7.4 stop gate.
 
 Local security hardening also includes explicit CORS methods and headers, response security headers,
 strict request schema validation, generated upload storage keys, Docker socket removal from worker

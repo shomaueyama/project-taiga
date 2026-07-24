@@ -49,3 +49,6 @@ If an Access policy change exposes the application too broadly:
 2. Confirm only the two approved emails are included.
 3. Confirm no Bypass, Everyone, or domain-wide rule is active.
 4. Confirm unauthenticated `GET /api/v1/me` returns `401`.
+
+For Phase 7.4, also confirm `app.taiganova.app` and `api.taiganova.app` remain covered by the
+approved Cloudflare Access applications after rollback.

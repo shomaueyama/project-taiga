@@ -17,6 +17,9 @@ Store the dump in a private, encrypted location. Do not commit dumps.
 For Neon, also review the project snapshot/restore options before each migration because free-tier
 limits can change.
 
+For Phase 7.4, record only the Neon project name, database name, and backup timestamp. Do not record
+credentials or full connection strings.
+
 ## Restore Drill
 
 1. Create a temporary Neon database.
