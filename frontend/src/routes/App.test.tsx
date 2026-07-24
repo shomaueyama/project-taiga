@@ -69,7 +69,7 @@ function installFetch(
     const body = init?.body ? JSON.parse(String(init.body)) : null;
     calls.push({ path, method, body });
 
-    if (path === "/health") {
+    if (path === "/api/health") {
       return response({
         status: "ok",
         app_env: "local",

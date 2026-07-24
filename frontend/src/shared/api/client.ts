@@ -2,9 +2,9 @@ import { z } from "zod";
 
 const healthSchema = z.object({
   status: z.string(),
-  app_env: z.string(),
-  runner_enabled: z.boolean(),
-  exam_enabled: z.boolean(),
+  app_env: z.string().optional(),
+  runner_enabled: z.boolean().optional(),
+  exam_enabled: z.boolean().optional(),
 });
 
 export type Health = z.infer<typeof healthSchema>;
@@ -13,6 +13,16 @@ const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 const apiBaseUrl = resolveApiBaseUrl(configuredApiBaseUrl);
 const authStorageKey = "taiga.localUser";
 const requestTimeoutMs = 20_000;
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
 
 function resolveApiBaseUrl(value: string | undefined): string {
   if (import.meta.env.PROD && !value) {
@@ -199,6 +209,11 @@ async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit): P
   const timeoutId = window.setTimeout(() => controller.abort(), requestTimeoutMs);
   try {
     return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiError("API request timed out", 0);
+    }
+    throw error;
   } finally {
     window.clearTimeout(timeoutId);
   }
@@ -209,7 +224,7 @@ async function apiGet<T>(path: string, schema: z.ZodType<T>): Promise<T> {
     headers: { Authorization: `Bearer local:${getStoredLocalUser()}` },
   });
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    throw new ApiError(`API request failed: ${response.status}`, response.status);
   }
   return schema.parse(await response.json());
 }
@@ -225,17 +240,35 @@ async function apiPost<T>(path: string, body: unknown, schema: z.ZodType<T>): Pr
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    throw new ApiError(`API request failed: ${response.status}`, response.status);
   }
   return schema.parse(await response.json());
 }
 
 export async function getHealth(): Promise<Health> {
-  const response = await fetchWithTimeout(`${apiBaseUrl}/health`);
+  const response = await fetchWithTimeout(`${apiBaseUrl}/api/health`);
   if (!response.ok) {
-    throw new Error(`Health check failed: ${response.status}`);
+    throw new ApiError(`Health check failed: ${response.status}`, response.status);
   }
   return healthSchema.parse(await response.json());
+}
+
+export function apiErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 0) {
+      return "サーバーを起動しています。初回のみ数十秒かかる場合があります。";
+    }
+    if (error.status === 401) {
+      return "認証セッションを確認できません。Cloudflare Accessで再認証してください。";
+    }
+    if (error.status === 403) {
+      return "このメールアドレスにはTAIGA NOVAへのアクセス権がありません。";
+    }
+    if (error.status >= 500) {
+      return "サーバーで問題が発生しました。時間をおいて再試行してください。";
+    }
+  }
+  return "通信に失敗しました。時間をおいて再試行してください。";
 }
 
 export function getMe(): Promise<UserProfile> {

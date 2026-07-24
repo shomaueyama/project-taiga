@@ -5,6 +5,7 @@ from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from taiga.cloudflare_access import AccessVerificationError, verify_cloudflare_access
 from taiga.config import Settings, get_settings
 from taiga.infrastructure.database import get_session
 
@@ -51,10 +52,23 @@ def local_email_from_headers(
 def get_current_principal(
     authorization: str | None = Header(default=None),
     x_local_user: str | None = Header(default=None),
+    cf_access_jwt_assertion: str | None = Header(
+        default=None,
+        alias="Cf-Access-Jwt-Assertion",
+    ),
     settings: Settings = settings_dependency,
     session: Session = session_dependency,
 ) -> Principal:
-    email = local_email_from_headers(authorization, x_local_user, settings)
+    if settings.app_env == "local":
+        email = local_email_from_headers(authorization, x_local_user, settings)
+    else:
+        try:
+            email = verify_cloudflare_access(cf_access_jwt_assertion, settings).email
+        except AccessVerificationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"code": str(exc), "message": "Cloudflare Access authentication required"},
+            ) from exc
     row = (
         session.execute(
             text(

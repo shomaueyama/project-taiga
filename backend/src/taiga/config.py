@@ -1,6 +1,7 @@
 from functools import lru_cache
+from urllib.parse import urlparse
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +23,18 @@ class Settings(BaseSettings):
     frontend_origins: str = Field(
         default="http://localhost:5173",
         validation_alias="FRONTEND_ORIGINS",
+    )
+    cloudflare_access_team_domain: str | None = Field(
+        default=None,
+        validation_alias="CLOUDFLARE_ACCESS_TEAM_DOMAIN",
+    )
+    cloudflare_access_aud: str | None = Field(
+        default=None,
+        validation_alias="CLOUDFLARE_ACCESS_AUD",
+    )
+    authorized_user_emails: str | None = Field(
+        default=None,
+        validation_alias="AUTHORIZED_USER_EMAILS",
     )
     runner_enabled: bool = Field(default=False, validation_alias="RUNNER_ENABLED")
     exam_enabled: bool = Field(default=False, validation_alias="EXAM_ENABLED")
@@ -85,9 +98,49 @@ class Settings(BaseSettings):
                 raise ValueError("Production FRONTEND_ORIGINS must use HTTPS")
         return ",".join(origins)
 
+    @field_validator("cloudflare_access_team_domain")
+    @classmethod
+    def cloudflare_team_domain_has_origin_shape(cls, value: str | None) -> str | None:
+        if value is None or value == "":
+            return None
+        normalized = value.rstrip("/")
+        parsed = urlparse(normalized)
+        if parsed.scheme != "https" or not parsed.netloc:
+            raise ValueError("CLOUDFLARE_ACCESS_TEAM_DOMAIN must be an HTTPS origin")
+        return normalized
+
+    @model_validator(mode="after")
+    def production_configuration_is_safe(self) -> "Settings":
+        if self.app_env != "production":
+            return self
+        if self.local_auth_enabled:
+            raise ValueError("LOCAL_AUTH_ENABLED must be false in production")
+        if self.runner_enabled:
+            raise ValueError("RUNNER_ENABLED must be false in production")
+        database_host = urlparse(self.database_url).hostname
+        if database_host in {None, "", "localhost", "127.0.0.1", "::1", "postgres"}:
+            raise ValueError("Production DATABASE_URL must not target a local database")
+        if not self.cloudflare_access_team_domain:
+            raise ValueError("CLOUDFLARE_ACCESS_TEAM_DOMAIN is required in production")
+        if not self.cloudflare_access_aud:
+            raise ValueError("CLOUDFLARE_ACCESS_AUD is required in production")
+        if len(self.authorized_email_set) != 2:
+            raise ValueError("AUTHORIZED_USER_EMAILS must contain exactly two production users")
+        return self
+
     @property
     def allowed_frontend_origins(self) -> list[str]:
         return [origin.strip() for origin in self.frontend_origins.split(",") if origin.strip()]
+
+    @property
+    def authorized_email_set(self) -> set[str]:
+        if not self.authorized_user_emails:
+            return set()
+        return {
+            email.strip().lower()
+            for email in self.authorized_user_emails.split(",")
+            if email.strip()
+        }
 
 
 @lru_cache

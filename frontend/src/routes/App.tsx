@@ -20,6 +20,7 @@ import orbitIllustration from "../assets/illustrations/nova-orbit.svg";
 import {
   createDemoSubmission,
   createExamAttempt,
+  apiErrorMessage,
   getAssignments,
   getAdminUsers,
   getAnalytics,
@@ -369,14 +370,14 @@ export function App() {
           ) : null}
           {health.isError ? (
             <Alert tone="warning">
-              サーバーに接続できません。時間をおいて再試行してください。
+              {apiErrorMessage(health.error)}
               <button type="button" onClick={() => health.refetch()}>
                 再試行
               </button>
             </Alert>
           ) : null}
           {me.isError ? (
-            <Alert tone="danger">利用者を確認できません。ローカル利用者を選び直してください。</Alert>
+            <Alert tone="danger">{apiErrorMessage(me.error)}</Alert>
           ) : null}
           {activeRoute === "/dashboard" ? (
             <section className="page-stack dashboard-grid" aria-labelledby="dashboard-title">

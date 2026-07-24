@@ -89,6 +89,12 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Local-User"],
 )
+legacy_health_routes = {
+    "/health",
+    "/ready",
+    "/api/v1/health/live",
+    "/api/v1/health/ready",
+}
 settings_dependency = Depends(get_settings)
 session_dependency = Depends(get_session)
 principal_dependency = Depends(get_current_principal)
@@ -117,6 +123,14 @@ async def security_middleware(
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
     settings = get_settings()
+    if (
+        settings.app_env == "production"
+        and request.url.path == "/api/health"
+        and request.method != "GET"
+    ):
+        return add_security_headers(JSONResponse(status_code=404, content={"detail": "Not found"}))
+    if settings.app_env == "production" and request.url.path in legacy_health_routes:
+        return add_security_headers(JSONResponse(status_code=404, content={"detail": "Not found"}))
     if not rate_limit_allows(request, settings):
         return too_many_requests_response()
     response = await call_next(request)
@@ -125,12 +139,19 @@ async def security_middleware(
 
 @app.get("/health", tags=["system"])
 def health(settings: Settings = settings_dependency) -> dict[str, object]:
+    if settings.app_env == "production":
+        return {"status": "ok"}
     return {
         "status": "ok",
         "app_env": settings.app_env,
         "runner_enabled": settings.runner_enabled,
         "exam_enabled": settings.exam_enabled,
     }
+
+
+@app.get("/api/health", tags=["system"])
+def production_health() -> dict[str, str]:
+    return {"status": "ok"}
 
 
 @app.get("/ready", tags=["system"])

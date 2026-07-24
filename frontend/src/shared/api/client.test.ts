@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  ApiError,
+  apiErrorMessage,
   createDemoSubmission,
   createExamAttempt,
   getAdminUsers,
@@ -65,7 +67,7 @@ describe("api client", () => {
 
   it("parses read endpoints and rejects non-2xx responses", async () => {
     const responses: Record<string, unknown> = {
-      "/health": { status: "ok", app_env: "local", runner_enabled: false, exam_enabled: true },
+      "/api/health": { status: "ok", app_env: "local", runner_enabled: false, exam_enabled: true },
       "/api/v1/dashboard": { today: [], overdue: [], nextExam: null, rank: null, capabilityGaps: [] },
       "/api/v1/assignments": {
         items: [
@@ -215,7 +217,7 @@ describe("api client", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) =>
-        String(input).endsWith("/health")
+        String(input).endsWith("/api/health")
           ? jsonResponse({ status: "down" }, 503)
           : jsonResponse({ error: "denied" }, 403),
       ),
@@ -223,5 +225,12 @@ describe("api client", () => {
 
     await expect(getHealth()).rejects.toThrow("Health check failed: 503");
     await expect(getAssignments()).rejects.toThrow("API request failed: 403");
+  });
+
+  it("maps production access and cold-start errors to Japanese messages", () => {
+    expect(apiErrorMessage(new ApiError("timeout", 0))).toContain("起動");
+    expect(apiErrorMessage(new ApiError("unauthorized", 401))).toContain("再認証");
+    expect(apiErrorMessage(new ApiError("forbidden", 403))).toContain("アクセス権");
+    expect(apiErrorMessage(new ApiError("server", 503))).toContain("サーバー");
   });
 });

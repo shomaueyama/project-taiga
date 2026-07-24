@@ -12,7 +12,7 @@ Cloudflare Pages
 
 Render Free Web Service
   FastAPI via uvicorn taiga.main:app --host 0.0.0.0 --port $PORT
-  Health check: /health
+  Health check: /api/health
   PostgreSQL connection from DATABASE_URL
 
 Neon Free
@@ -40,8 +40,8 @@ AWS Terraform under `infra/` is preserved as a future paid/enterprise deployment
 | Database | SQLAlchemy engine from `DATABASE_URL` |
 | Migrations | Alembic under `backend/alembic/` |
 | CORS | `FRONTEND_ORIGINS` environment variable |
-| Authentication | LocalAuth only; production authentication remains a blocker before public exposure |
-| Health | `/health`, `/ready`, `/api/v1/health/live`, `/api/v1/health/ready` |
+| Authentication | Cloudflare Access JWT validation in production; LocalAuth only in local |
+| Health | production public endpoint is `GET /api/health` |
 | File uploads | local filesystem manifest writes under `LOCAL_STORAGE_ROOT/uploads` |
 | CI | `.github/workflows/ci.yml` |
 | AWS infra | `infra/` preserved |
@@ -77,13 +77,16 @@ Names only:
 - `RATE_LIMIT_MAX_REQUESTS`
 - `WORKER_IDLE_POLL_SECONDS`
 - `WORKER_ERROR_RETRY_SECONDS`
+- `CLOUDFLARE_ACCESS_TEAM_DOMAIN`
+- `CLOUDFLARE_ACCESS_AUD`
+- `AUTHORIZED_USER_EMAILS`
 
 ## Cloudflare Pages Setup
 
 - Root directory: `frontend`
 - Build command: `npm install && npm run build`
 - Output directory: `dist`
-- Production variable: `VITE_API_BASE_URL=https://<render-service>.onrender.com`
+- Production variable: `VITE_API_BASE_URL=https://api.<domain>`
 - SPA fallback: `frontend/public/_redirects`
 
 `VITE_API_BASE_URL` is required in production and must use HTTPS.
@@ -97,12 +100,16 @@ Use `render.yaml` or manual setup:
 - Root directory: `backend`
 - Build command: `pip install -e ".[dev]"`
 - Start command: `uvicorn taiga.main:app --host 0.0.0.0 --port $PORT`
-- Health check path: `/health`
+- Health check path: `/api/health`
 
 Required Render secrets:
 
 - `DATABASE_URL`
+- `MIGRATION_DATABASE_URL`
 - `FRONTEND_ORIGINS`
+- `CLOUDFLARE_ACCESS_TEAM_DOMAIN`
+- `CLOUDFLARE_ACCESS_AUD`
+- `AUTHORIZED_USER_EMAILS`
 
 Set:
 
@@ -123,20 +130,11 @@ Set:
 The backend normalizes `postgres://` and `postgresql://` URLs to SQLAlchemy's `postgresql+psycopg://`
 driver form at runtime.
 
-## Authentication Warning
+## Authentication
 
-The current application uses LocalAuth and rejects LocalAuth outside `APP_ENV=local`. That is correct
-for safety, but it means the two-user production deployment still needs a production authentication
-decision before authenticated flows can be safely exposed.
-
-Recommended minimal path:
-
-1. Put Cloudflare Access or another approved identity gate in front of the frontend and backend.
-2. Add backend verification for the selected identity headers or tokens.
-3. Map only Shoma and Taiga to application users.
-4. Keep public self-registration disabled.
-
-Do not run production with `APP_ENV=local` merely to keep LocalAuth working.
+Cloudflare Access must protect both `app.<domain>` and `api.<domain>`. The backend independently
+validates `Cf-Access-Jwt-Assertion` and maps only approved emails to existing application users.
+Do not run production with `APP_ENV=local`.
 
 ## Cold Starts
 
@@ -172,4 +170,3 @@ Consider paid upgrade when:
 - Runner execution is introduced.
 
 Expected first paid upgrade: Render always-on backend.
-
