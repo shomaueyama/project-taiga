@@ -74,7 +74,7 @@ test("learner can view dashboard, assignments, disabled runner, and disabled exa
   await page.getByRole("link", { name: "課題" }).click();
   await expect(page.getByRole("heading", { name: "課題" })).toBeVisible();
   await expect(page.getByLabel("課題詳細")).toContainText("提出履歴:");
-  await page.getByRole("link", { name: "実行確認" }).click();
+  await page.getByRole("link", { name: "実行環境" }).click();
   await expect(page.getByRole("button", { name: "提出を実行確認する" })).toBeDisabled();
   await expect(page.getByText("実行結果はまだありません。")).toBeVisible();
   await page.getByRole("link", { name: "試験" }).click();

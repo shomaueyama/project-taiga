@@ -31,6 +31,10 @@ export const statusLabels: Record<string, string> = {
   expired: "期限切れ",
   published: "公開済み",
   restricted: "権限が必要",
+  ahead: "予定より先行",
+  on_schedule: "予定どおり",
+  behind: "予定より遅れ",
+  unknown: "判定不可",
 };
 
 export function labelForStatus(status: string | null | undefined): string {

@@ -53,7 +53,9 @@ function localUserFrom(init?: RequestInit) {
   return authorization.replace("Bearer local:", "");
 }
 
-function installFetch(options: { runnerEnabled?: boolean; examEnabled?: boolean } = {}) {
+function installFetch(
+  options: { runnerEnabled?: boolean; examEnabled?: boolean; todayAssignment?: boolean } = {},
+) {
   const calls: Array<{ path: string; method: string; body: unknown }> = [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
@@ -74,8 +76,19 @@ function installFetch(options: { runnerEnabled?: boolean; examEnabled?: boolean 
       return response(userForEmail(localUserFrom(init)));
     }
     if (path === "/api/v1/dashboard") {
+      const today = options.todayAssignment
+        ? [
+            {
+              id: assignmentId,
+              stableCode: "TASK-001",
+              title: "Typing basics",
+              scheduledDate: "2026-07-23",
+              status: "available",
+            },
+          ]
+        : [];
       return response({
-        today: [],
+        today,
         overdue: [],
         nextExam: options.examEnabled
           ? { id: examId, stableCode: "EXAM-001", scheduledAt: now, status: "scheduled" }
@@ -188,11 +201,11 @@ function installFetch(options: { runnerEnabled?: boolean; examEnabled?: boolean 
   return { calls, fetchMock };
 }
 
-function renderApp() {
+function renderApp(initialEntries = ["/"]) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={initialEntries}>
         <App />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -211,9 +224,15 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { name: "ダッシュボード" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "ローカルログイン" })).toBeInTheDocument();
+    expect(screen.getAllByText("TAIGA NOVA").length).toBeGreaterThan(0);
+    expect(screen.getByRole("progressbar", { name: "学習進捗" })).toHaveAttribute(
+      "aria-valuenow",
+      "0",
+    );
+    expect(await screen.findByText("予定より遅れています")).toBeInTheDocument();
     expect(await screen.findByText("正常")).toBeInTheDocument();
     expect(await screen.findByText("上山 虎雅 · 学習者")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("link", { name: "実行確認" }));
+    fireEvent.click(screen.getByRole("link", { name: "実行環境" }));
     expect(screen.getByRole("button", { name: "提出を実行確認する" })).toBeDisabled();
     expect(screen.getByText("実行結果はまだありません。")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "試験" }));
@@ -233,12 +252,41 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "デモ回答を提出" }));
 
     expect(await screen.findByText(`提出を作成しました: ${submissionId}`)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("link", { name: "実行確認" }));
+    fireEvent.click(screen.getByRole("link", { name: "実行環境" }));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "提出を実行確認する" })).toBeEnabled(),
     );
     fireEvent.click(screen.getByRole("button", { name: "提出を実行確認する" }));
     expect(await screen.findByText("完了")).toBeInTheDocument();
+  });
+
+  it("renders populated dashboard rows, opens assignment detail, and handles mobile drawer", async () => {
+    installFetch({ todayAssignment: true });
+    renderApp();
+
+    expect(await screen.findByText("Typing basics")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "ナビゲーションを開く" }));
+    expect(screen.getAllByRole("button", { name: "ナビゲーションを閉じる" })[0]).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByRole("button", { name: "ナビゲーションを開く" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "課題" }));
+    fireEvent.click(await screen.findByRole("button", { name: "詳細を開く" }));
+    expect(screen.getByLabelText("課題詳細")).toHaveTextContent("Typing basics");
+  });
+
+  it("renders the TAIGA NOVA off-orbit not found route", async () => {
+    installFetch();
+    renderApp(["/missing"]);
+
+    expect(screen.getByRole("heading", { name: "ページが見つかりません" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "ダッシュボードへ戻る" })).toBeInTheDocument();
   });
 
   it("loads admin-only panels and reviews pending submissions", async () => {

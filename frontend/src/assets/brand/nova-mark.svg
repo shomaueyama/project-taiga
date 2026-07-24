@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="TAIGA NOVA">
+  <rect width="64" height="64" rx="18" fill="#18243D"/>
+  <path d="M32 8l4.8 18.4L55 32l-18.2 5.6L32 56l-4.8-18.4L9 32l18.2-5.6L32 8z" fill="#E4C36B"/>
+  <path d="M15 42c9.5 8.5 25.8 8 35-1.7" fill="none" stroke="#E8F1F7" stroke-width="3" stroke-linecap="round"/>
+</svg>
