@@ -1,5 +1,8 @@
 # Phase 6.75 Handoff
 
+Update: Phase 6.75 completed the visual QA pass. Current results are recorded in
+`docs/phase-6-75/`.
+
 ## Visual QA Items
 
 - Replace or post-process TAIGA status images so checkerboard backgrounds are not visible.
