@@ -161,3 +161,32 @@ jobs:
         run: |
           ! grep -RInE '(AWS_SECRET_ACCESS_KEY|BEGIN RSA PRIVATE KEY|gh[p]_|gh[o]_)' \
             --exclude-dir=.git --exclude='*.md' --exclude='ci.yml' .
+
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+      - name: Terraform format
+        run: terraform fmt -check -recursive infra
+      - name: Terraform validate staging
+        working-directory: infra/environments/staging
+        run: |
+          terraform init -backend=false
+          terraform validate
+      - name: Terraform validate production
+        working-directory: infra/environments/production
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Docker Compose config validation
+        run: docker compose config --quiet
+      - name: Docker Compose build
+        run: docker compose build

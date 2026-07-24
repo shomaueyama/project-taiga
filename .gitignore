@@ -8,6 +8,17 @@ __pycache__/
 .ruff_cache/
 .venv/
 *.egg-info/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
 node_modules/
 dist/
 coverage/

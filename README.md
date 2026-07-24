@@ -125,6 +125,19 @@ Phase 5 performance and scalability records are in `docs/phase-5/`.
 Phase 6 UX, Japanese localization, accessibility, and responsive records are in `docs/phase-6/`.
 Phase 6.5 TAIGA NOVA visual language records are in `docs/phase-6-5/`.
 Phase 6.75 visual QA and layout stabilization records are in `docs/phase-6-75/`.
+Phase 7 production infrastructure records are in `docs/phase-7/` and `infra/`.
+
+## Production Infrastructure
+
+Phase 7 Terraform lives under `infra/` with staging and production roots. Validate without creating
+AWS resources:
+
+```bash
+make terraform-validate
+```
+
+Do not run `terraform apply` until AWS account ownership, remote state, GitHub OIDC, Route53, ACM,
+and rollout approval are confirmed. Production infrastructure keeps `RUNNER_ENABLED=false`.
 
 ## Feature Flags
 
