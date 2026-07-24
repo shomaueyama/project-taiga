@@ -78,7 +78,9 @@ export function App() {
   const routeAssignmentId = location.pathname.match(/^\/assignments\/([^/]+)/)?.[1] ?? null;
   const previousPathRef = useRef(location.pathname);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const sidebarRef = useRef<HTMLElement | null>(null);
   const [isMobileNavOpen, setMobileNavOpen] = useState(false);
+  const [isNarrowViewport, setNarrowViewport] = useState(false);
   const [localUser, setLocalUser] = useState(getStoredLocalUser());
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(routeAssignmentId);
   const [lastSubmissionId, setLastSubmissionId] = useState<string | null>(null);
@@ -219,15 +221,51 @@ export function App() {
     if (!isMobileNavOpen) {
       return;
     }
-    function closeOnEscape(event: KeyboardEvent) {
+    document.body.style.overflow = "hidden";
+    const focusableElements = () =>
+      Array.from(
+        sidebarRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+    focusableElements()[0]?.focus();
+
+    function handleDrawerKeydown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setMobileNavOpen(false);
         menuButtonRef.current?.focus();
       }
+      if (event.key !== "Tab") {
+        return;
+      }
+      const focusable = focusableElements();
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) {
+        return;
+      }
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
+    window.addEventListener("keydown", handleDrawerKeydown);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleDrawerKeydown);
+    };
   }, [isMobileNavOpen]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 1023px)");
+    const updateNarrowViewport = () => setNarrowViewport(media.matches);
+    updateNarrowViewport();
+    media.addEventListener("change", updateNarrowViewport);
+    return () => media.removeEventListener("change", updateNarrowViewport);
+  }, []);
 
   return (
     <div className={`shell ${isMobileNavOpen ? "nav-open" : ""}`}>
@@ -262,7 +300,14 @@ export function App() {
         />
       ) : null}
 
-      <aside id="site-sidebar" className="sidebar" aria-label="TAIGA NOVA ナビゲーション">
+      <aside
+        id="site-sidebar"
+        ref={sidebarRef}
+        className="sidebar"
+        aria-label="TAIGA NOVA ナビゲーション"
+        aria-hidden={isNarrowViewport && !isMobileNavOpen ? "true" : undefined}
+        {...(isNarrowViewport && !isMobileNavOpen ? { inert: true } : {})}
+      >
         <BrandLockup />
         <nav className="nav-panel" aria-label="主要ナビゲーション">
           {visibleNav.map((item) => {
@@ -630,7 +675,8 @@ function MissionProgressCard({
           aria-label="学習進捗"
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-valuenow={percentage}
+          aria-valuenow={progress.percentage ?? undefined}
+          aria-valuetext={progress.percentage === null ? "進捗は未判定です" : `${percentage}%`}
         >
           <span style={{ width: `${percentage}%` }} />
         </div>
@@ -647,7 +693,7 @@ function MissionProgressCard({
       </div>
       <div className="mission-visual">
         {progress.imageSrc ? (
-          <img src={progress.imageSrc} alt={progress.imageAlt} width="220" height="220" />
+          <img src={progress.imageSrc} alt={progress.imageAlt} width="360" height="360" />
         ) : (
           <img src={orbitIllustration} alt="" aria-hidden="true" width="220" height="160" />
         )}
