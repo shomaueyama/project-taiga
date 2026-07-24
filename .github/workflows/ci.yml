@@ -37,6 +37,11 @@ jobs:
       - name: Backend migration
         working-directory: backend
         run: alembic upgrade head
+      - name: Backend migration state
+        working-directory: backend
+        run: |
+          alembic heads
+          alembic current
       - name: Backend seed validation
         working-directory: backend
         run: |
@@ -77,6 +82,11 @@ jobs:
       - name: Frontend test
         working-directory: frontend
         run: npm test -- --run
+      - name: Frontend production build
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: https://api.example.invalid
+        run: npm run build
       - name: Frontend coverage
         working-directory: frontend
         run: npm run test:coverage -- --run

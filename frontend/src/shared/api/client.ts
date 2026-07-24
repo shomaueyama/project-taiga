@@ -9,8 +9,21 @@ const healthSchema = z.object({
 
 export type Health = z.infer<typeof healthSchema>;
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const apiBaseUrl = resolveApiBaseUrl(configuredApiBaseUrl);
 const authStorageKey = "taiga.localUser";
+const requestTimeoutMs = 20_000;
+
+function resolveApiBaseUrl(value: string | undefined): string {
+  if (import.meta.env.PROD && !value) {
+    throw new Error("VITE_API_BASE_URL is required for production builds.");
+  }
+  const resolved = value ?? "http://localhost:8000";
+  if (import.meta.env.PROD && !resolved.startsWith("https://")) {
+    throw new Error("VITE_API_BASE_URL must use HTTPS in production.");
+  }
+  return resolved.replace(/\/$/, "");
+}
 
 const assignmentSummarySchema = z.object({
   id: z.string(),
@@ -181,8 +194,18 @@ export function setStoredLocalUser(email: string): void {
   window.localStorage.setItem(authStorageKey, email);
 }
 
+async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), requestTimeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 async function apiGet<T>(path: string, schema: z.ZodType<T>): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}/api/v1${path}`, {
+  const response = await fetchWithTimeout(`${apiBaseUrl}/api/v1${path}`, {
     headers: { Authorization: `Bearer local:${getStoredLocalUser()}` },
   });
   if (!response.ok) {
@@ -192,7 +215,7 @@ async function apiGet<T>(path: string, schema: z.ZodType<T>): Promise<T> {
 }
 
 async function apiPost<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}/api/v1${path}`, {
+  const response = await fetchWithTimeout(`${apiBaseUrl}/api/v1${path}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer local:${getStoredLocalUser()}`,
@@ -208,7 +231,7 @@ async function apiPost<T>(path: string, body: unknown, schema: z.ZodType<T>): Pr
 }
 
 export async function getHealth(): Promise<Health> {
-  const response = await fetch(`${apiBaseUrl}/health`);
+  const response = await fetchWithTimeout(`${apiBaseUrl}/health`);
   if (!response.ok) {
     throw new Error(`Health check failed: ${response.status}`);
   }

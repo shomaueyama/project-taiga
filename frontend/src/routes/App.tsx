@@ -364,6 +364,17 @@ export function App() {
         </header>
 
         <main id="main-content" className="main-content" tabIndex={-1}>
+          {health.isPending ? (
+            <Alert tone="info">サーバーを起動しています。初回のみ数十秒かかる場合があります。</Alert>
+          ) : null}
+          {health.isError ? (
+            <Alert tone="warning">
+              サーバーに接続できません。時間をおいて再試行してください。
+              <button type="button" onClick={() => health.refetch()}>
+                再試行
+              </button>
+            </Alert>
+          ) : null}
           {me.isError ? (
             <Alert tone="danger">利用者を確認できません。ローカル利用者を選び直してください。</Alert>
           ) : null}

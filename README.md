@@ -126,6 +126,9 @@ Phase 6 UX, Japanese localization, accessibility, and responsive records are in 
 Phase 6.5 TAIGA NOVA visual language records are in `docs/phase-6-5/`.
 Phase 6.75 visual QA and layout stabilization records are in `docs/phase-6-75/`.
 Phase 7 production infrastructure records are in `docs/phase-7/` and `infra/`.
+Phase 7.1 Cloudflare-native assessment records are in `docs/phase-7-cloudflare/`.
+Phase 7.2 free two-user deployment records are in `docs/phase-7-2/` and
+`docs/deployment/cloudflare-render-neon.md`.
 
 ## Production Infrastructure
 

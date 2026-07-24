@@ -84,7 +84,7 @@ from taiga.submission_service import (
 app = FastAPI(title="Project Taiga Local MVP", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=get_settings().allowed_frontend_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Local-User"],
