@@ -13,9 +13,12 @@ async function expectNoHorizontalOverflow(page: import("@playwright/test").Page)
 }
 
 test("major pages pass automated accessibility checks", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/dashboard");
   await selectUser(page, "taiga@example.local");
   await expect(page.getByRole("heading", { name: "ダッシュボード" })).toBeVisible();
+  await expect(page.locator(".sidebar").getByText("TAIGA NOVA")).toBeVisible();
+  await expect(page.getByRole("progressbar", { name: "学習進捗" })).toBeVisible();
   let results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);
 
@@ -70,6 +73,7 @@ test("keyboard user can skip to content and activate navigation", async ({ page 
   await page.getByRole("link", { name: "課題" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "課題" })).toBeVisible();
+  await expect(page.locator("#main-content")).toBeFocused();
 });
 
 test("dashboard initial load does not issue duplicate API requests", async ({ page }) => {

@@ -123,6 +123,7 @@ Phase 3 domain and architecture refactoring records are in `docs/phase-3/`.
 Phase 4 security hardening records are in `docs/phase-4/`.
 Phase 5 performance and scalability records are in `docs/phase-5/`.
 Phase 6 UX, Japanese localization, accessibility, and responsive records are in `docs/phase-6/`.
+Phase 6.5 TAIGA NOVA visual language records are in `docs/phase-6-5/`.
 
 ## Feature Flags
 
