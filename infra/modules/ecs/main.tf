@@ -88,9 +88,9 @@ resource "aws_ecs_task_definition" "backend" {
 
   container_definitions = jsonencode([
     {
-      name      = "backend"
-      image     = var.backend_image
-      essential = true
+      name         = "backend"
+      image        = var.backend_image
+      essential    = true
       portMappings = [{ containerPort = var.app_port, protocol = "tcp" }]
       environment  = local.common_environment
       secrets      = [{ name = "DATABASE_URL", valueFrom = var.database_url_parameter_arn }]
@@ -140,7 +140,7 @@ resource "aws_ecs_service" "backend" {
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.backend.arn
   desired_count   = var.backend_desired_count
-  launch_type      = "FARGATE"
+  launch_type     = "FARGATE"
 
   network_configuration {
     subnets          = var.private_subnet_ids
@@ -160,7 +160,7 @@ resource "aws_ecs_service" "worker" {
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.worker.arn
   desired_count   = var.worker_desired_count
-  launch_type      = "FARGATE"
+  launch_type     = "FARGATE"
 
   network_configuration {
     subnets          = var.private_subnet_ids
