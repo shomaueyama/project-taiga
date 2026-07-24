@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+const apiBaseUrl = "http://localhost:8000/api/v1";
+
 async function watchPage(page: import("@playwright/test").Page) {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
@@ -24,6 +26,41 @@ async function openLocalMvp(page: import("@playwright/test").Page) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Project Taiga" })).toBeVisible();
   return errors;
+}
+
+async function createLearnerSubmission(request: import("@playwright/test").APIRequestContext) {
+  const authHeaders = { Authorization: "Bearer local:taiga@example.local" };
+  const assignments = await request.get(`${apiBaseUrl}/assignments`, { headers: authHeaders });
+  expect(assignments.status()).toBe(200);
+  const assignmentId = (await assignments.json()).items[0].id;
+  const sha256 = "a".repeat(64);
+  const upload = await request.post(`${apiBaseUrl}/uploads/presign`, {
+    headers: { ...authHeaders, "Idempotency-Key": crypto.randomUUID() },
+    data: {
+      originalName: `answer-${crypto.randomUUID()}.md`,
+      mediaType: "text/markdown",
+      sizeBytes: 10,
+      sha256,
+    },
+  });
+  expect(upload.status()).toBe(201);
+  const uploadId = (await upload.json()).id;
+  const complete = await request.post(`${apiBaseUrl}/uploads/${uploadId}/complete`, {
+    headers: { ...authHeaders, "Idempotency-Key": crypto.randomUUID() },
+    data: { sizeBytes: 10, sha256 },
+  });
+  expect(complete.status()).toBe(202);
+  const submission = await request.post(`${apiBaseUrl}/assignments/${assignmentId}/submissions`, {
+    headers: { ...authHeaders, "Idempotency-Key": crypto.randomUUID() },
+    data: {
+      sourceType: "file_upload",
+      repositoryUrl: null,
+      commitHash: null,
+      uploadIds: [uploadId],
+    },
+  });
+  expect(submission.status()).toBe(201);
+  return (await submission.json()).id as string;
 }
 
 test("learner can view dashboard, assignments, disabled runner, and disabled exam", async ({
@@ -58,7 +95,11 @@ test("learner can create a local demo submission and retain state on reload", as
   expect(errors).toEqual([]);
 });
 
-test("admin can view users, analytics, curriculum, flags, and review queue", async ({ page }) => {
+test("admin can view users, analytics, curriculum, flags, and review queue", async ({
+  page,
+  request,
+}) => {
+  const submissionId = await createLearnerSubmission(request);
   const errors = await openLocalMvp(page);
   await page.getByLabel("Local user").selectOption("admin@example.local");
 
@@ -68,11 +109,8 @@ test("admin can view users, analytics, curriculum, flags, and review queue", asy
   await expect(page.getByLabel("Feature flags")).toContainText("exam.enabled: disabled");
   await expect(page.getByText("published")).toBeVisible();
 
-  const approveButton = page.getByRole("button", { name: "Approve" });
-  if (await approveButton.isEnabled()) {
-    await approveButton.click();
-    await expect(page.getByText("approved")).toBeVisible();
-  }
+  await page.getByRole("button", { name: `Approve ${submissionId.slice(0, 8)}` }).click();
+  await expect(page.getByText("approved")).toBeVisible();
   expect(errors).toEqual([]);
 });
 

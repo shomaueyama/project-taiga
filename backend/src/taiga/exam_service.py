@@ -19,6 +19,7 @@ from taiga.api_schemas import (
     SubmitExamRequest,
 )
 from taiga.auth import Principal
+from taiga.config import get_settings
 
 
 def _json(value: object) -> str:
@@ -70,6 +71,8 @@ def reserve_attempt(
     exam_id: uuid.UUID,
     _request: CreateExamAttemptRequest,
 ) -> ExamAttemptResponse:
+    if not get_settings().exam_enabled:
+        raise PermissionError("Exam is disabled")
     variant = (
         session.execute(
             text(
@@ -190,6 +193,8 @@ def start_attempt(
     attempt_id: uuid.UUID,
     request: StartExamRequest,
 ) -> ExamAttemptDetail:
+    if not get_settings().exam_enabled:
+        raise PermissionError("Exam is disabled")
     if not request.acknowledgeRules:
         raise ValueError("Exam rules must be acknowledged")
     row = _attempt_row(session, principal, attempt_id)
@@ -216,6 +221,8 @@ def submit_attempt(
     attempt_id: uuid.UUID,
     request: SubmitExamRequest,
 ) -> ExamAttemptDetail:
+    if not get_settings().exam_enabled:
+        raise PermissionError("Exam is disabled")
     row = _attempt_row(session, principal, attempt_id)
     if row["status"] != "in_progress":
         return get_attempt_detail(session, principal, attempt_id)
@@ -258,6 +265,8 @@ def oral_review(
     attempt_id: uuid.UUID,
     request: OralReviewRequest,
 ) -> ExamAttemptDetail:
+    if not get_settings().exam_enabled:
+        raise PermissionError("Exam is disabled")
     if principal.role not in {"reviewer", "admin"}:
         raise PermissionError("Reviewer role required")
     status = "passed" if request.passed else "failed"

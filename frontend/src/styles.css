@@ -116,7 +116,8 @@ button:disabled {
 }
 
 .metric-row,
-.assignment-row {
+.assignment-row,
+.review-row {
   display: flex;
   justify-content: space-between;
   gap: 16px;
@@ -139,6 +140,7 @@ button:disabled {
 }
 
 .assignment-row span,
+.review-row span,
 .assignment-row time,
 .login-panel p {
   color: #52615d;

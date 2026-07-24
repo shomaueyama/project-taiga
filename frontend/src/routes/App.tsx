@@ -63,7 +63,12 @@ export function App() {
     enabled: canReview,
     retry: false,
   });
-  const exams = useQuery({ queryKey: ["exams", localUser], queryFn: getExams, enabled: isSignedIn });
+  const examEnabled = health.data?.exam_enabled === true;
+  const exams = useQuery({
+    queryKey: ["exams", localUser],
+    queryFn: getExams,
+    enabled: isSignedIn && examEnabled,
+  });
   const adminUsers = useQuery({
     queryKey: ["admin-users", localUser],
     queryFn: getAdminUsers,
@@ -98,13 +103,13 @@ export function App() {
     onSuccess: (job) => setLastRunnerStatus(job.status),
   });
   const reviewPendingSubmission = useMutation({
-    mutationFn: (result: "approved" | "needs_revision") => {
-      const submissionId = reviewQueue.data?.items[0]?.id;
-      if (!submissionId) {
-        throw new Error("No pending submission");
-      }
-      return reviewSubmission(submissionId, result);
-    },
+    mutationFn: ({
+      submissionId,
+      result,
+    }: {
+      submissionId: string;
+      result: "approved" | "needs_revision";
+    }) => reviewSubmission(submissionId, result),
     onSuccess: async (review) => {
       setLastReviewResult(review.result);
       await queryClient.invalidateQueries({ queryKey: ["review-queue", localUser] });
@@ -136,7 +141,7 @@ export function App() {
   const pendingReview = reviewQueue.data?.items[0];
   const firstExam = exams.data?.items[0];
   const runnerDisabled = health.data?.runner_enabled === false;
-  const examDisabled = health.data?.exam_enabled === false;
+  const examDisabled = !examEnabled;
 
   return (
     <main className="shell">
@@ -245,22 +250,37 @@ export function App() {
             <span>Selected</span>
             <strong>{pendingReview?.status ?? "none"}</strong>
           </div>
-          <div className="button-row">
-            <button
-              type="button"
-              disabled={me.data?.role === "learner" || !pendingReview}
-              onClick={() => reviewPendingSubmission.mutate("approved")}
-            >
-              Approve
-            </button>
-            <button
-              type="button"
-              disabled={me.data?.role === "learner" || !pendingReview}
-              onClick={() => reviewPendingSubmission.mutate("needs_revision")}
-            >
-              Request revision
-            </button>
-          </div>
+          {(reviewQueue.data?.items ?? []).slice(0, 5).map((submission) => (
+            <div className="review-row" key={submission.id}>
+              <span>{submission.id.slice(0, 8)}</span>
+              <div className="button-row">
+                <button
+                  type="button"
+                  disabled={me.data?.role === "learner"}
+                  onClick={() =>
+                    reviewPendingSubmission.mutate({
+                      submissionId: submission.id,
+                      result: "approved",
+                    })
+                  }
+                >
+                  Approve {submission.id.slice(0, 8)}
+                </button>
+                <button
+                  type="button"
+                  disabled={me.data?.role === "learner"}
+                  onClick={() =>
+                    reviewPendingSubmission.mutate({
+                      submissionId: submission.id,
+                      result: "needs_revision",
+                    })
+                  }
+                >
+                  Request revision {submission.id.slice(0, 8)}
+                </button>
+              </div>
+            </div>
+          ))}
           <p aria-live="polite">{lastReviewResult ?? "No review action"}</p>
         </section>
         <section className="panel">

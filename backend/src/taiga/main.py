@@ -279,6 +279,8 @@ def review_submission(
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Submission not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.post(
@@ -296,6 +298,8 @@ def run_submission(
 ) -> RunnerJobResponse:
     try:
         return queue_runner_job(session, principal, submission_id, request)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Submission not found") from exc
 
@@ -324,6 +328,8 @@ def create_exam_attempt(
 ) -> ExamAttemptResponse:
     try:
         return reserve_attempt(session, principal, exam_id, request)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -354,6 +360,8 @@ def start_exam_attempt(
 ) -> ExamAttemptDetail:
     try:
         return start_attempt(session, principal, attempt_id, request)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except (LookupError, ValueError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -372,6 +380,8 @@ def submit_exam_attempt(
 ) -> ExamAttemptDetail:
     try:
         return submit_attempt(session, principal, attempt_id, request)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Exam attempt not found") from exc
 
