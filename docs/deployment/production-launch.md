@@ -79,7 +79,8 @@ AUTHORIZED_USER_EMAILS=shomabirdie@icloud.com,taiga-albatross@softbank.ne.jp
 - Project: `taiga-nova-production`
 - Database: `taiga`
 - Migration: Alembic `head` 適用済み
-- 現在 revision: `0002_phase5_performance_indexes`
+- 現在 revision: `0003_schedule_calendar`
+- Production curriculum/schedule seed: `taiga.production_seed` で投入済み
 
 接続文字列は `.env.neon.local` などの gitignored ファイルだけに保存します。コミットしません。
 
@@ -91,6 +92,20 @@ AUTHORIZED_USER_EMAILS=shomabirdie@icloud.com,taiga-albatross@softbank.ne.jp
 |---|---|---|---|
 | `shomabirdie@icloud.com` | Shoma | admin | Asia/Tokyo |
 | `taiga-albatross@softbank.ne.jp` | Taiga | learner | Asia/Tokyo |
+
+## 課題データ
+
+本番 DB に canonical curriculum を投入済みです。
+
+- weeks: 28
+- task templates: 196
+- task assignments: Taiga learner に 196 件
+- exams: 28
+- exam variants: 56
+- schedule days: 2026-07-27 から 2027-03-26 まで全日
+- schedule items: 課題、重要日程、月末確認、Piscine本番を投入済み
+
+local demo submission、runner job、exam attempt fixture は本番には投入しません。
 
 ## Smoke 結果
 

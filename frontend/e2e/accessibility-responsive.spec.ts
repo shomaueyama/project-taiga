@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 const widths = [320, 375, 390, 768, 1024, 1440];
 
 async function selectUser(page: import("@playwright/test").Page, email: string) {
+  await page.evaluate((value) => window.localStorage.setItem("taiga.localUser", value), email);
   await page.getByLabel("ローカル利用者").selectOption(email);
 }
 
@@ -24,6 +25,11 @@ test("major pages pass automated accessibility checks", async ({ page }) => {
 
   await page.goto("/assignments");
   await expect(page.getByRole("heading", { name: "課題" })).toBeVisible();
+  results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations).toEqual([]);
+
+  await page.goto("/schedule");
+  await expect(page.getByRole("heading", { name: "スケジュール" })).toBeVisible();
   results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);
 
@@ -49,6 +55,10 @@ test("core routes are responsive without horizontal overflow", async ({ page }) 
 
     await page.goto("/assignments");
     await expect(page.getByRole("heading", { name: "課題" })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    await page.goto("/schedule");
+    await expect(page.getByRole("heading", { name: "スケジュール" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
     await selectUser(page, "reviewer@example.local");
@@ -82,6 +92,9 @@ test("keyboard user can skip to content and activate navigation", async ({ page,
 
 test("dashboard initial load does not issue duplicate API requests", async ({ page }) => {
   const counts = new Map<string, number>();
+  await page.addInitScript(() => {
+    window.localStorage.setItem("taiga.localUser", "taiga@example.local");
+  });
   page.on("request", (request) => {
     const url = new URL(request.url());
     if (url.origin !== "http://localhost:8000") {

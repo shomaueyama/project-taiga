@@ -16,6 +16,7 @@ EXPECTED_TABLES = {
     "rank_history",
     "reviews",
     "runner_jobs",
+    "schedule_items",
     "submission_artifacts",
     "submissions",
     "task_assignments",

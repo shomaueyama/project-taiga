@@ -78,6 +78,51 @@ const assignmentDetailSchema = z.object({
   submissions: z.array(z.unknown()),
 });
 
+const scheduleItemSchema = z.object({
+  id: z.string(),
+  scheduleKey: z.string(),
+  date: z.string(),
+  startAt: z.string().nullable(),
+  endAt: z.string().nullable(),
+  title: z.string(),
+  description: z.string(),
+  itemType: z.string(),
+  assignmentId: z.string().nullable(),
+  milestoneKey: z.string().nullable(),
+  priority: z.number(),
+  dueAt: z.string().nullable(),
+  sourceUrl: z.string().nullable(),
+  isRequired: z.boolean(),
+  displayStatus: z.string(),
+  isOverdue: z.boolean(),
+  overdueDays: z.number(),
+  isToday: z.boolean(),
+  assignmentUrl: z.string().nullable(),
+  metadata: z.record(z.string(), z.unknown()),
+});
+
+const scheduleDaySchema = z.object({
+  date: z.string(),
+  representativeStatus: z.string(),
+  isToday: z.boolean(),
+  items: z.array(scheduleItemSchema),
+});
+
+const schedulePageSchema = z.object({
+  fromDate: z.string(),
+  toDate: z.string(),
+  days: z.array(scheduleDaySchema),
+});
+
+const scheduleSummarySchema = z.object({
+  todayCount: z.number(),
+  learnerOverdueCount: z.number(),
+  reviewWaitingCount: z.number(),
+  nextImportantDate: z.string().nullable(),
+  nextImportantTitle: z.string().nullable(),
+  daysUntilPiscine: z.number(),
+});
+
 const progressSchema = z.object({
   completedWeeks: z.number().nullable().optional(),
   capabilities: z.array(z.object({ code: z.string(), level: z.number() })),
@@ -182,6 +227,24 @@ export type AssignmentSummary = z.infer<typeof assignmentSummarySchema>;
 export type Dashboard = z.infer<typeof dashboardSchema>;
 export type AssignmentPage = z.infer<typeof assignmentPageSchema>;
 export type AssignmentDetail = z.infer<typeof assignmentDetailSchema>;
+export type ScheduleItem = z.infer<typeof scheduleItemSchema>;
+export type ScheduleDay = z.infer<typeof scheduleDaySchema>;
+export type SchedulePage = z.infer<typeof schedulePageSchema>;
+export type ScheduleSummary = z.infer<typeof scheduleSummarySchema>;
+export type ScheduleItemInput = {
+  date?: string;
+  title?: string;
+  description?: string;
+  itemType?: string;
+  assignmentId?: string | null;
+  milestoneKey?: string | null;
+  statusOverride?: string | null;
+  priority?: number;
+  dueAt?: string | null;
+  sourceUrl?: string | null;
+  isRequired?: boolean;
+  metadata?: Record<string, unknown>;
+};
 export type Progress = z.infer<typeof progressSchema>;
 export type UploadSession = z.infer<typeof uploadSessionSchema>;
 export type Submission = z.infer<typeof submissionSchema>;
@@ -245,6 +308,35 @@ async function apiPost<T>(path: string, body: unknown, schema: z.ZodType<T>): Pr
   return schema.parse(await response.json());
 }
 
+async function apiPatch<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
+  const response = await fetchWithTimeout(`${apiBaseUrl}/api/v1${path}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer local:${getStoredLocalUser()}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": crypto.randomUUID(),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new ApiError(`API request failed: ${response.status}`, response.status);
+  }
+  return schema.parse(await response.json());
+}
+
+async function apiDelete(path: string): Promise<void> {
+  const response = await fetchWithTimeout(`${apiBaseUrl}/api/v1${path}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer local:${getStoredLocalUser()}`,
+      "Idempotency-Key": crypto.randomUUID(),
+    },
+  });
+  if (!response.ok) {
+    throw new ApiError(`API request failed: ${response.status}`, response.status);
+  }
+}
+
 export async function getHealth(): Promise<Health> {
   const response = await fetchWithTimeout(`${apiBaseUrl}/api/health`);
   if (!response.ok) {
@@ -285,6 +377,30 @@ export function getAssignments(): Promise<AssignmentPage> {
 
 export function getAssignment(id: string): Promise<AssignmentDetail> {
   return apiGet(`/assignments/${id}`, assignmentDetailSchema);
+}
+
+export function getSchedule(fromDate: string, toDate: string): Promise<SchedulePage> {
+  return apiGet(`/schedule?from=${fromDate}&to=${toDate}`, schedulePageSchema);
+}
+
+export function getScheduleDay(date: string): Promise<ScheduleDay> {
+  return apiGet(`/schedule/${date}`, scheduleDaySchema);
+}
+
+export function getScheduleSummary(): Promise<ScheduleSummary> {
+  return apiGet("/schedule/summary", scheduleSummarySchema);
+}
+
+export function createScheduleItem(input: ScheduleItemInput): Promise<ScheduleItem> {
+  return apiPost("/admin/schedule-items", input, scheduleItemSchema);
+}
+
+export function updateScheduleItem(id: string, input: ScheduleItemInput): Promise<ScheduleItem> {
+  return apiPatch(`/admin/schedule-items/${id}`, input, scheduleItemSchema);
+}
+
+export function deleteScheduleItem(id: string): Promise<void> {
+  return apiDelete(`/admin/schedule-items/${id}`);
 }
 
 export function getProgress(): Promise<Progress> {

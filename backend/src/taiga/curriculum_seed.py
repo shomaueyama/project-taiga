@@ -417,7 +417,14 @@ def seed_realistic_local_state(session: Session, users: dict[str, uuid.UUID]) ->
     )
 
 
-def seed_curriculum(session: Session, source_dir: Path, storage_root: Path) -> None:
+def seed_curriculum(
+    session: Session,
+    source_dir: Path,
+    storage_root: Path,
+    *,
+    users: dict[str, uuid.UUID] | None = None,
+    include_local_demo_state: bool = True,
+) -> None:
     content_hash = canonical_hash(source_dir)
     curriculum_version_id = stable_uuid("curriculum-version", CURRICULUM_VERSION)
     session.execute(
@@ -435,7 +442,8 @@ def seed_curriculum(session: Session, source_dir: Path, storage_root: Path) -> N
         {"id": curriculum_version_id, "version": CURRICULUM_VERSION, "content_hash": content_hash},
     )
 
-    users = seed_local_users(session)
+    if users is None:
+        users = seed_local_users(session)
     weeks = load_json(source_dir, "weeks")
     task_templates = load_json(source_dir, "task_templates")
     task_assignments = load_json(source_dir, "task_assignments")
@@ -524,7 +532,7 @@ def seed_curriculum(session: Session, source_dir: Path, storage_root: Path) -> N
 
     for assignment in task_assignments:
         learner_id = users[assignment["userRef"]]
-        assignment_id = stable_uuid("task-assignment", assignment["id"])
+        assignment_id = stable_uuid("task-assignment", f"{assignment['id']}:{learner_id}")
         session.execute(
             text(
                 """
@@ -634,27 +642,32 @@ def seed_curriculum(session: Session, source_dir: Path, storage_root: Path) -> N
             },
         )
 
-    admin_id = users["admin"]
-    for key, enabled in {"runner.enabled": False, "exam.enabled": False}.items():
-        session.execute(
-            text(
-                """
-                INSERT INTO feature_flags (id, key, enabled, rules_json, updated_by)
-                VALUES (:id, :key, :enabled, '{}'::jsonb, :updated_by)
-                ON CONFLICT (key) DO UPDATE
-                SET enabled = EXCLUDED.enabled,
-                    updated_by = EXCLUDED.updated_by,
-                    updated_at = now()
-                """
-            ),
-            {
-                "id": stable_uuid("feature-flag", key),
-                "key": key,
-                "enabled": enabled,
-                "updated_by": admin_id,
-            },
-        )
-    seed_realistic_local_state(session, users)
+    admin_id = users.get("admin")
+    if admin_id is not None:
+        for key, enabled in {"runner.enabled": False, "exam.enabled": False}.items():
+            session.execute(
+                text(
+                    """
+                    INSERT INTO feature_flags (id, key, enabled, rules_json, updated_by)
+                    VALUES (:id, :key, :enabled, '{}'::jsonb, :updated_by)
+                    ON CONFLICT (key) DO UPDATE
+                    SET enabled = EXCLUDED.enabled,
+                        updated_by = EXCLUDED.updated_by,
+                        updated_at = now()
+                    """
+                ),
+                {
+                    "id": stable_uuid("feature-flag", key),
+                    "key": key,
+                    "enabled": enabled,
+                    "updated_by": admin_id,
+                },
+            )
+    if include_local_demo_state:
+        seed_realistic_local_state(session, users)
+        from taiga.schedule_seed import seed_schedule_items
+
+        seed_schedule_items(session)
 
 
 def seed() -> None:

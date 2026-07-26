@@ -116,6 +116,92 @@ function installFetch(
         nextCursor: null,
       });
     }
+    if (path === "/api/v1/schedule") {
+      return response({
+        fromDate: url.searchParams.get("from"),
+        toDate: url.searchParams.get("to"),
+        days: [
+          {
+            date: "2026-07-27",
+            representativeStatus: "learner_overdue",
+            isToday: false,
+            items: [
+              {
+                id: "00000000-0000-0000-0000-000000000021",
+                scheduleKey: "taiga-2026-07-27-fe-baseline",
+                date: "2026-07-27",
+                startAt: null,
+                endAt: null,
+                title: "基本情報：現在地確認",
+                description: "現在地確認を提出する。",
+                itemType: "assignment",
+                assignmentId,
+                milestoneKey: null,
+                priority: 10,
+                dueAt: "2026-07-27T14:59:00Z",
+                sourceUrl: null,
+                isRequired: true,
+                displayStatus: "learner_overdue",
+                isOverdue: true,
+                overdueDays: 1,
+                isToday: false,
+                assignmentUrl: `/assignments/${assignmentId}`,
+                metadata: {
+                  deliverables: ["回答画面"],
+                  acceptanceCriteria: ["Shomaが承認"],
+                  allowedEvidenceTypes: ["screenshot", "photo", "text"],
+                },
+              },
+            ],
+          },
+        ],
+      });
+    }
+    if (path === "/api/v1/schedule/summary") {
+      return response({
+        todayCount: 1,
+        learnerOverdueCount: 1,
+        reviewWaitingCount: 0,
+        nextImportantDate: "2026-09-05",
+        nextImportantTitle: "42 Tokyo高校生向けオープンスクール・現地見学",
+        daysUntilPiscine: 218,
+      });
+    }
+    if (path.startsWith("/api/v1/schedule/")) {
+      return response({
+        date: path.split("/").at(-1) ?? "2026-07-27",
+        representativeStatus: "learner_overdue",
+        isToday: false,
+        items: [
+          {
+            id: "00000000-0000-0000-0000-000000000021",
+            scheduleKey: "taiga-2026-07-27-fe-baseline",
+            date: "2026-07-27",
+            startAt: null,
+            endAt: null,
+            title: "基本情報：現在地確認",
+            description: "現在地確認を提出する。",
+            itemType: "assignment",
+            assignmentId,
+            milestoneKey: null,
+            priority: 10,
+            dueAt: "2026-07-27T14:59:00Z",
+            sourceUrl: null,
+            isRequired: true,
+            displayStatus: "learner_overdue",
+            isOverdue: true,
+            overdueDays: 1,
+            isToday: false,
+            assignmentUrl: `/assignments/${assignmentId}`,
+            metadata: {
+              deliverables: ["回答画面"],
+              acceptanceCriteria: ["Shomaが承認"],
+              allowedEvidenceTypes: ["screenshot", "photo", "text"],
+            },
+          },
+        ],
+      });
+    }
     if (path === `/api/v1/assignments/${assignmentId}` && method === "GET") {
       return response({
         assignment: {
@@ -314,6 +400,17 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("link", { name: "課題" }));
     fireEvent.click(await screen.findByRole("button", { name: "詳細を開く" }));
     expect(screen.getByLabelText("課題詳細")).toHaveTextContent("Typing basics");
+  });
+
+  it("shows the schedule calendar and opens linked assignments", async () => {
+    installFetch();
+    renderApp(["/schedule"]);
+
+    expect(await screen.findByRole("heading", { name: "スケジュール" })).toBeInTheDocument();
+    expect(await screen.findAllByText("基本情報：現在地確認")).not.toHaveLength(0);
+    expect(await screen.findAllByText("遅延")).not.toHaveLength(0);
+    fireEvent.click(await screen.findByRole("button", { name: "課題詳細へ" }));
+    expect(await screen.findByRole("heading", { name: "課題" })).toBeInTheDocument();
   });
 
   it("renders a neutral unknown mission progress state", async () => {

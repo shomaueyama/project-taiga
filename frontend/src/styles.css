@@ -97,13 +97,17 @@ body {
 
 a,
 button,
-select {
+select,
+input,
+textarea {
   font: inherit;
 }
 
 a:focus-visible,
 button:focus-visible,
 select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
 [tabindex]:focus-visible {
   outline: 3px solid var(--nova-focus);
   outline-offset: 2px;
@@ -574,6 +578,7 @@ h2 {
 }
 
 .status-badge[data-status="approved"],
+.status-badge[data-status="passed"],
 .status-badge[data-status="succeeded"],
 .status-badge[data-status="ahead"] {
   border-color: rgba(53, 107, 87, 0.24);
@@ -582,6 +587,9 @@ h2 {
 }
 
 .status-badge[data-status="behind"],
+.status-badge[data-status="learner_overdue"],
+.status-badge[data-status="review_overdue"],
+.status-badge[data-status="revision_requested"],
 .status-badge[data-status="needs_revision"],
 .status-badge[data-status="timed_out"],
 .status-badge[data-status="security_rejected"] {
@@ -591,12 +599,269 @@ h2 {
 }
 
 .status-badge[data-status="on_schedule"],
+.status-badge[data-status="review_waiting"],
 .status-badge[data-status="manual_review_pending"],
 .status-badge[data-status="queued"],
 .status-badge[data-status="running"] {
   border-color: rgba(51, 95, 138, 0.24);
   background: var(--color-info-bg);
   color: var(--color-info);
+}
+
+.schedule-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.schedule-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.schedule-toolbar strong {
+  min-width: 9rem;
+  text-align: center;
+  font-size: var(--font-size-xl);
+}
+
+.icon-text-button {
+  padding-inline: var(--space-3);
+}
+
+.schedule-calendar {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.calendar-weekdays span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  text-align: center;
+}
+
+.calendar-cell {
+  min-width: 0;
+  min-height: 118px;
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 4px;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  text-align: left;
+  overflow: hidden;
+}
+
+.calendar-cell[data-muted="true"] {
+  opacity: 0.56;
+}
+
+.calendar-cell[data-selected="true"] {
+  outline: 3px solid var(--nova-focus);
+  outline-offset: 0;
+}
+
+.calendar-cell[data-status="learner_overdue"],
+.calendar-cell[data-status="review_overdue"] {
+  border-color: rgba(161, 70, 70, 0.42);
+  background: var(--color-danger-bg);
+}
+
+.calendar-cell[data-status="revision_requested"] {
+  border-color: rgba(163, 94, 45, 0.38);
+  background: var(--color-warning-bg);
+}
+
+.calendar-cell[data-status="review_waiting"] {
+  border-color: rgba(51, 95, 138, 0.3);
+  background: var(--color-info-bg);
+}
+
+.calendar-cell[data-status="approved"] {
+  border-color: rgba(53, 107, 87, 0.3);
+  background: var(--color-success-bg);
+}
+
+.calendar-day-number {
+  font-weight: 800;
+}
+
+.today-label,
+.calendar-status-text,
+.calendar-count,
+.calendar-chip {
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  line-height: 1.35;
+}
+
+.today-label {
+  padding: 0 6px;
+  background: var(--nova-navy-800);
+  color: var(--nova-ink-inverse);
+  font-weight: 700;
+}
+
+.calendar-status-text,
+.calendar-count {
+  color: var(--color-text-secondary);
+  font-weight: 700;
+}
+
+.calendar-chip {
+  width: 100%;
+  padding: 2px 4px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-detail-panel,
+.schedule-admin-panel,
+.schedule-item-list,
+.schedule-item-card,
+.schedule-item-meta,
+.priority-strip {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.schedule-detail-panel {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.schedule-admin-panel {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.schedule-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.schedule-admin-panel label {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+.schedule-admin-panel input,
+.schedule-admin-panel select,
+.schedule-admin-panel textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--nova-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.schedule-admin-panel textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.checkbox-row {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.checkbox-row input {
+  width: 20px;
+  min-height: 20px;
+}
+
+.priority-strip {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-tinted);
+}
+
+.priority-strip span {
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  font-weight: 800;
+}
+
+.schedule-item-card {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.schedule-item-card[data-status="learner_overdue"],
+.schedule-item-card[data-status="review_overdue"] {
+  border-left: 5px solid var(--color-danger);
+}
+
+.schedule-item-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.schedule-item-heading div {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.schedule-item-heading span,
+.schedule-item-meta dt {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.schedule-item-card p,
+.schedule-item-meta,
+.schedule-item-meta dd {
+  margin: 0;
+}
+
+.schedule-item-card p {
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.schedule-item-meta {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.schedule-item-meta div {
+  display: grid;
+  gap: var(--space-1);
 }
 
 button,
@@ -742,7 +1007,9 @@ button:disabled {
 
   .app-header,
   .dashboard-grid,
-  .mission-card {
+  .mission-card,
+  .schedule-summary-grid,
+  .schedule-admin-grid {
     grid-template-columns: 1fr;
   }
 
@@ -771,7 +1038,42 @@ button:disabled {
   }
 
   .status-grid,
-  .card-grid {
+  .card-grid,
+  .schedule-item-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-toolbar {
+    display: grid;
+  }
+
+  .schedule-toolbar strong {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .calendar-weekdays,
+  .calendar-grid {
+    gap: 3px;
+  }
+
+  .calendar-cell {
+    min-height: 76px;
+    padding: 4px;
+  }
+
+  .calendar-status-text,
+  .calendar-chip {
+    display: none;
+  }
+
+  .calendar-count {
+    font-size: 0.68rem;
+  }
+
+  .priority-strip,
+  .schedule-item-heading {
+    display: grid;
     grid-template-columns: 1fr;
   }
 

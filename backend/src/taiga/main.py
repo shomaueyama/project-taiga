@@ -1,4 +1,5 @@
 from collections.abc import Awaitable, Callable
+from datetime import date
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Path, Query, Request, Response, status
@@ -23,6 +24,7 @@ from taiga.api_schemas import (
     CompleteUploadRequest,
     CreateExamAttemptRequest,
     CreateReviewRequest,
+    CreateScheduleItemRequest,
     CreateSubmissionRequest,
     CreateUploadRequest,
     CurriculumVersionPage,
@@ -43,11 +45,16 @@ from taiga.api_schemas import (
     ReviewResponse,
     RunnerJobResponse,
     RunSubmissionRequest,
+    ScheduleDayResponse,
+    ScheduleItemResponse,
+    SchedulePage,
+    ScheduleSummary,
     StartExamRequest,
     SubmissionDetail,
     SubmissionResponse,
     SubmitExamRequest,
     UpdateFeatureFlagRequest,
+    UpdateScheduleItemRequest,
     UploadSessionResponse,
     UserProfile,
 )
@@ -70,6 +77,15 @@ from taiga.exam_service import (
 )
 from taiga.infrastructure.database import database_ready, get_session
 from taiga.runner_jobs import queue_runner_job
+from taiga.schedule_service import (
+    create_schedule_item,
+    delete_schedule_item,
+    get_schedule,
+    get_schedule_day,
+    get_schedule_summary,
+    seed_schedule_for_local,
+    update_schedule_item,
+)
 from taiga.security import add_security_headers, rate_limit_allows, too_many_requests_response
 from taiga.submission_service import (
     complete_upload,
@@ -104,6 +120,7 @@ submission_id_path = Path(alias="submissionId")
 exam_id_path = Path(alias="examId")
 attempt_id_path = Path(alias="attemptId")
 user_id_path = Path(alias="userId")
+schedule_item_id_path = Path(alias="scheduleItemId")
 list_limit_query = Query(default=20, ge=1, le=100)
 
 
@@ -215,6 +232,41 @@ def progress(
     session: Session = session_dependency,
 ) -> Progress:
     return get_progress(session, principal)
+
+
+@app.get("/api/v1/schedule", response_model=SchedulePage, tags=["schedule"])
+def schedule(
+    from_date: str = Query(alias="from", pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    to_date: str = Query(alias="to", pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> SchedulePage:
+    try:
+        return get_schedule(
+            session,
+            principal,
+            date.fromisoformat(from_date),
+            date.fromisoformat(to_date),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/schedule/summary", response_model=ScheduleSummary, tags=["schedule"])
+def schedule_summary(
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> ScheduleSummary:
+    return get_schedule_summary(session, principal)
+
+
+@app.get("/api/v1/schedule/{selectedDate}", response_model=ScheduleDayResponse, tags=["schedule"])
+def schedule_day(
+    selected_date: str = Path(alias="selectedDate", pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> ScheduleDayResponse:
+    return get_schedule_day(session, principal, date.fromisoformat(selected_date))
 
 
 @app.post(
@@ -566,6 +618,77 @@ def admin_update_feature_flag(
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Feature flag not found") from exc
+
+
+@app.post("/api/v1/admin/schedule/seed", tags=["admin", "schedule"])
+def admin_seed_schedule(
+    settings: Settings = settings_dependency,
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> dict[str, object]:
+    if principal.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+    if settings.app_env != "local":
+        raise HTTPException(status_code=403, detail="Schedule seed is local-only")
+    return {"insertedOrUpdated": seed_schedule_for_local(session)}
+
+
+@app.post(
+    "/api/v1/admin/schedule-items",
+    response_model=ScheduleItemResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["admin", "schedule"],
+)
+def admin_create_schedule_item(
+    request: CreateScheduleItemRequest,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> ScheduleItemResponse:
+    try:
+        return create_schedule_item(session, principal, request)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@app.patch(
+    "/api/v1/admin/schedule-items/{scheduleItemId}",
+    response_model=ScheduleItemResponse,
+    tags=["admin", "schedule"],
+)
+def admin_update_schedule_item(
+    request: UpdateScheduleItemRequest,
+    schedule_item_id: UUID = schedule_item_id_path,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> ScheduleItemResponse:
+    try:
+        return update_schedule_item(session, principal, schedule_item_id, request)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Schedule item not found") from exc
+
+
+@app.delete(
+    "/api/v1/admin/schedule-items/{scheduleItemId}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["admin", "schedule"],
+)
+def admin_delete_schedule_item(
+    schedule_item_id: UUID = schedule_item_id_path,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> Response:
+    try:
+        delete_schedule_item(session, principal, schedule_item_id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Schedule item not found") from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.get("/api/v1/admin/analytics/learning", response_model=LearningAnalytics, tags=["admin"])

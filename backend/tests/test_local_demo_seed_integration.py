@@ -99,6 +99,16 @@ def test_realistic_local_seed_is_idempotent() -> None:
 
     assert scalar("SELECT count(*) FROM weeks") == 28
     assert scalar("SELECT count(*) FROM task_templates") == 196
-    assert scalar("SELECT count(*) FROM task_assignments") == 196
+    assert (
+        scalar(
+            """
+            SELECT count(*)
+            FROM task_assignments a
+            JOIN users u ON u.id = a.learner_id
+            WHERE u.cognito_sub = 'taiga@example.local'
+            """
+        )
+        == 196
+    )
     assert scalar("SELECT count(*) FROM exams") == 28
     assert scalar("SELECT count(*) FROM exam_variants") == 56

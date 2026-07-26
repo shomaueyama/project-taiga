@@ -1,7 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,
+  CalendarDays,
   CheckSquare,
+  ChevronLeft,
+  ChevronRight,
   Compass,
   GraduationCap,
   LayoutDashboard,
@@ -19,7 +22,9 @@ import novaMark from "../assets/brand/nova-mark.svg";
 import orbitIllustration from "../assets/illustrations/nova-orbit.svg";
 import {
   createDemoSubmission,
+  createScheduleItem,
   createExamAttempt,
+  deleteScheduleItem,
   apiErrorMessage,
   getAssignments,
   getAdminUsers,
@@ -33,12 +38,19 @@ import {
   getMe,
   getProgress,
   getReviewQueue,
+  getSchedule,
+  getScheduleDay,
+  getScheduleSummary,
   getStoredLocalUser,
   reviewSubmission,
   runSubmission,
   setStoredLocalUser,
   startExamAttempt,
   submitExamAttempt,
+  updateScheduleItem,
+  type ScheduleDay,
+  type ScheduleItem,
+  type ScheduleItemInput,
 } from "../shared/api/client";
 import { formatDate, labelForRole, labelForStatus, shortId } from "../shared/labels";
 import { calculateMissionProgress, type MissionProgress } from "../shared/mission";
@@ -54,6 +66,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { path: "/dashboard", label: "ダッシュボード", roles: ["learner", "reviewer", "admin"], icon: LayoutDashboard },
+  { path: "/schedule", label: "スケジュール", roles: ["learner", "admin"], icon: CalendarDays },
   { path: "/assignments", label: "課題", roles: ["learner", "admin"], icon: BookOpen },
   { path: "/reviews", label: "レビュー", roles: ["reviewer", "admin"], icon: CheckSquare },
   { path: "/runner", label: "実行環境", roles: ["learner", "admin"], icon: PlayCircle },
@@ -88,6 +101,11 @@ export function App() {
   const [lastRunnerStatus, setLastRunnerStatus] = useState<string | null>(null);
   const [lastReviewResult, setLastReviewResult] = useState<string | null>(null);
   const [lastExamStatus, setLastExamStatus] = useState<string | null>(null);
+  const [scheduleMonth, setScheduleMonth] = useState(() => startOfMonth(todayIsoDate()));
+  const [selectedScheduleDate, setSelectedScheduleDate] = useState(todayIsoDate());
+  const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(() =>
+    emptyScheduleForm(todayIsoDate()),
+  );
 
   const health = useQuery({ queryKey: ["health"], queryFn: getHealth });
   const me = useQuery({ queryKey: ["me", localUser], queryFn: getMe });
@@ -103,6 +121,22 @@ export function App() {
     queryKey: ["assignments", localUser],
     queryFn: getAssignments,
     enabled: isSignedIn,
+  });
+  const scheduleRange = calendarRange(scheduleMonth);
+  const schedule = useQuery({
+    queryKey: ["schedule", localUser, scheduleRange.from, scheduleRange.to],
+    queryFn: () => getSchedule(scheduleRange.from, scheduleRange.to),
+    enabled: isSignedIn && activeRoute === "/schedule",
+  });
+  const scheduleDay = useQuery({
+    queryKey: ["schedule-day", localUser, selectedScheduleDate],
+    queryFn: () => getScheduleDay(selectedScheduleDate),
+    enabled: isSignedIn && activeRoute === "/schedule",
+  });
+  const scheduleSummary = useQuery({
+    queryKey: ["schedule-summary", localUser],
+    queryFn: getScheduleSummary,
+    enabled: isSignedIn && activeRoute === "/schedule",
   });
   const selectedAssignment =
     routeAssignmentId ?? selectedAssignmentId ?? assignments.data?.items[0]?.id ?? null;
@@ -185,6 +219,35 @@ export function App() {
     },
     onSuccess: (attempt) => setLastExamStatus(attempt.attempt.status),
   });
+  const saveScheduleItem = useMutation({
+    mutationFn: (input: ScheduleItemInput & { id?: string }) => {
+      const { id, ...payload } = input;
+      return id ? updateScheduleItem(id, payload) : createScheduleItem(payload);
+    },
+    onSuccess: async () => {
+      setScheduleForm(emptyScheduleForm(selectedScheduleDate));
+      await queryClient.invalidateQueries({ queryKey: ["schedule", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["schedule-day", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["schedule-summary", localUser] });
+    },
+  });
+  const cancelScheduleItem = useMutation({
+    mutationFn: (id: string) =>
+      updateScheduleItem(id, { statusOverride: "cancelled", isRequired: false }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["schedule", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["schedule-day", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["schedule-summary", localUser] });
+    },
+  });
+  const removeScheduleItem = useMutation({
+    mutationFn: deleteScheduleItem,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["schedule", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["schedule-day", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["schedule-summary", localUser] });
+    },
+  });
 
   function handleLocalUserChange(email: string) {
     setStoredLocalUser(email);
@@ -200,6 +263,40 @@ export function App() {
   function openAssignment(assignmentId: string) {
     setSelectedAssignmentId(assignmentId);
     navigate(`/assignments/${assignmentId}`);
+  }
+
+  function openScheduleAssignment(item: ScheduleItem) {
+    if (!item.assignmentId) {
+      return;
+    }
+    setSelectedAssignmentId(item.assignmentId);
+    navigate(`/assignments/${item.assignmentId}`);
+  }
+
+  function loadScheduleItemForEdit(item: ScheduleItem) {
+    setScheduleForm({
+      id: item.id,
+      date: item.date,
+      title: item.title,
+      description: item.description,
+      itemType: item.itemType,
+      priority: String(item.priority),
+      dueAt: item.dueAt ?? "",
+      sourceUrl: item.sourceUrl ?? "",
+      isRequired: item.isRequired,
+      statusOverride: item.displayStatus === "cancelled" ? "cancelled" : "",
+      deliverables: arrayMetadata(item.metadata.deliverables).join("\n"),
+      acceptanceCriteria: arrayMetadata(item.metadata.acceptanceCriteria).join("\n"),
+      allowedEvidenceTypes: arrayMetadata(item.metadata.allowedEvidenceTypes).join(", "),
+    });
+  }
+
+  function submitScheduleForm() {
+    const payload = formToScheduleInput(scheduleForm);
+    if (!payload.title || !payload.date || !payload.itemType) {
+      return;
+    }
+    saveScheduleItem.mutate({ ...payload, id: scheduleForm.id || undefined });
   }
 
   const firstAssignment = assignments.data?.items[0];
@@ -420,6 +517,96 @@ export function App() {
                 <Metric label="ランク" value={progress.data?.rank ?? "未判定"} />
               </div>
               <Alert tone="info">TAIGA NOVAは直接URL、ブラウザ更新、戻る操作に対応しています。</Alert>
+            </section>
+          ) : null}
+
+          {activeRoute === "/schedule" ? (
+            <section className="page-stack" aria-labelledby="schedule-title">
+              <PageHeader
+                eyebrow="DAILY CALENDAR"
+                title="スケジュール"
+                description="日単位の予定、未完了、遅延、重要日程を確認できます。"
+                titleId="schedule-title"
+              />
+              {schedule.isLoading || scheduleDay.isLoading || scheduleSummary.isLoading ? (
+                <LoadingState label="スケジュールを読み込み中です" />
+              ) : null}
+              {schedule.isError || scheduleDay.isError || scheduleSummary.isError ? (
+                <Alert tone="danger">スケジュールを読み込めません。</Alert>
+              ) : null}
+              <div className="schedule-summary-grid" aria-label="スケジュール概要">
+                <Metric label="今日の件数" value={scheduleSummary.data?.todayCount ?? 0} />
+                <Metric label="遅延" value={scheduleSummary.data?.learnerOverdueCount ?? 0} />
+                <Metric label="レビュー待ち" value={scheduleSummary.data?.reviewWaitingCount ?? 0} />
+                <Metric label="Piscineまで" value={`${scheduleSummary.data?.daysUntilPiscine ?? 0}日`} />
+              </div>
+              <div className="schedule-toolbar">
+                <button
+                  type="button"
+                  className="icon-text-button"
+                  onClick={() => setScheduleMonth(addMonths(scheduleMonth, -1))}
+                  aria-label="前月へ"
+                >
+                  <ChevronLeft aria-hidden size={18} />
+                  前月
+                </button>
+                <strong>{formatMonthLabel(scheduleMonth)}</strong>
+                <button
+                  type="button"
+                  className="icon-text-button"
+                  onClick={() => setScheduleMonth(addMonths(scheduleMonth, 1))}
+                  aria-label="次月へ"
+                >
+                  次月
+                  <ChevronRight aria-hidden size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const today = todayIsoDate();
+                    setScheduleMonth(startOfMonth(today));
+                    setSelectedScheduleDate(today);
+                  }}
+                >
+                  今日
+                </button>
+              </div>
+              {scheduleSummary.data?.nextImportantDate ? (
+                <Alert tone="info">
+                  次の重要日程: {formatDate(scheduleSummary.data.nextImportantDate)}{" "}
+                  {scheduleSummary.data.nextImportantTitle}
+                </Alert>
+              ) : null}
+              <ScheduleCalendar
+                month={scheduleMonth}
+                days={schedule.data?.days ?? []}
+                selectedDate={selectedScheduleDate}
+                onSelectDate={(date) => {
+                  setSelectedScheduleDate(date);
+                  setScheduleForm((current) =>
+                    current.id ? current : { ...current, date },
+                  );
+                }}
+              />
+              <ScheduleDayDetail
+                day={scheduleDay.data}
+                onOpenAssignment={openScheduleAssignment}
+                canAdmin={canAdmin}
+                onEditItem={loadScheduleItemForEdit}
+                onCancelItem={(id) => cancelScheduleItem.mutate(id)}
+                onDeleteItem={(id) => removeScheduleItem.mutate(id)}
+              />
+              {canAdmin ? (
+                <ScheduleAdminPanel
+                  form={scheduleForm}
+                  selectedDate={selectedScheduleDate}
+                  isSaving={saveScheduleItem.isPending}
+                  isMutating={cancelScheduleItem.isPending || removeScheduleItem.isPending}
+                  onChange={setScheduleForm}
+                  onSubmit={submitScheduleForm}
+                  onReset={() => setScheduleForm(emptyScheduleForm(selectedScheduleDate))}
+                />
+              ) : null}
             </section>
           ) : null}
 
@@ -659,6 +846,384 @@ function BrandLockup({ compact = false }: { compact?: boolean }) {
       </div>
     </div>
   );
+}
+
+const weekdayLabels = ["月", "火", "水", "木", "金", "土", "日"];
+
+const scheduleStatusLabels: Record<string, string> = {
+  learner_overdue: "遅延",
+  review_overdue: "レビュー期限超過",
+  revision_requested: "修正",
+  not_submitted: "未提出",
+  in_progress: "進行中",
+  review_waiting: "レビュー待ち",
+  not_started: "未開始",
+  approved: "合格",
+  cancelled: "対象外",
+  event: "予定",
+};
+
+function todayIsoDate() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(new Date());
+}
+
+function startOfMonth(isoDate: string) {
+  return `${isoDate.slice(0, 7)}-01`;
+}
+
+function addMonths(monthIso: string, amount: number) {
+  const [year, month] = monthIso.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1 + amount, 1));
+  return date.toISOString().slice(0, 10);
+}
+
+function isoFromDate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function calendarRange(monthIso: string) {
+  const [year, month] = monthIso.split("-").map(Number);
+  const first = new Date(Date.UTC(year, month - 1, 1));
+  const firstMondayOffset = (first.getUTCDay() + 6) % 7;
+  const from = new Date(first);
+  from.setUTCDate(first.getUTCDate() - firstMondayOffset);
+  const last = new Date(Date.UTC(year, month, 0));
+  const lastSundayOffset = 6 - ((last.getUTCDay() + 6) % 7);
+  const to = new Date(last);
+  to.setUTCDate(last.getUTCDate() + lastSundayOffset);
+  return { from: isoFromDate(from), to: isoFromDate(to) };
+}
+
+function formatMonthLabel(monthIso: string) {
+  const [year, month] = monthIso.split("-");
+  return `${year}年${Number(month)}月`;
+}
+
+function isSameMonth(dateIso: string, monthIso: string) {
+  return dateIso.slice(0, 7) === monthIso.slice(0, 7);
+}
+
+function ScheduleCalendar({
+  month,
+  days,
+  selectedDate,
+  onSelectDate,
+}: {
+  month: string;
+  days: ScheduleDay[];
+  selectedDate: string;
+  onSelectDate: (date: string) => void;
+}) {
+  return (
+    <section className="schedule-calendar" aria-label="月表示カレンダー">
+      <div className="calendar-weekdays" aria-hidden="true">
+        {weekdayLabels.map((label) => (
+          <span key={label}>{label}</span>
+        ))}
+      </div>
+      <div className="calendar-grid">
+        {days.map((day) => {
+          const label = scheduleStatusLabels[day.representativeStatus] ?? "予定";
+          return (
+            <button
+              key={day.date}
+              type="button"
+              className="calendar-cell"
+              data-status={day.representativeStatus}
+              data-selected={day.date === selectedDate ? "true" : undefined}
+              data-muted={!isSameMonth(day.date, month) ? "true" : undefined}
+              onClick={() => onSelectDate(day.date)}
+              aria-pressed={day.date === selectedDate}
+            >
+              <span className="calendar-day-number">{Number(day.date.slice(8, 10))}</span>
+              {day.isToday ? <span className="today-label">今日</span> : null}
+              <span className="calendar-status-text">{label}</span>
+              <span className="calendar-count">{day.items.length}件</span>
+              {day.items.slice(0, 2).map((item) => (
+                <span className="calendar-chip" key={item.id}>
+                  {item.title}
+                </span>
+              ))}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ScheduleDayDetail({
+  day,
+  onOpenAssignment,
+  canAdmin,
+  onEditItem,
+  onCancelItem,
+  onDeleteItem,
+}: {
+  day?: ScheduleDay;
+  onOpenAssignment: (item: ScheduleItem) => void;
+  canAdmin: boolean;
+  onEditItem: (item: ScheduleItem) => void;
+  onCancelItem: (id: string) => void;
+  onDeleteItem: (id: string) => void;
+}) {
+  const items = day?.items ?? [];
+  const topPriority = items.find((item) => item.isRequired) ?? items[0];
+  return (
+    <section className="schedule-detail-panel" aria-labelledby="schedule-detail-title">
+      <div className="section-heading">
+        <p className="eyebrow">DAY DETAIL</p>
+        <h2 id="schedule-detail-title">
+          {day ? formatDate(day.date) : "日付を選択してください"}
+        </h2>
+      </div>
+      {topPriority ? (
+        <div className="priority-strip">
+          <span>最優先</span>
+          <strong>{topPriority.title}</strong>
+          <StatusBadge status={topPriority.displayStatus} />
+        </div>
+      ) : (
+        <EmptyState title="この日の予定はありません。" />
+      )}
+      <div className="schedule-item-list">
+        {items.map((item) => {
+          const deliverables = arrayMetadata(item.metadata.deliverables);
+          const criteria = arrayMetadata(item.metadata.acceptanceCriteria);
+          const evidence = arrayMetadata(item.metadata.allowedEvidenceTypes);
+          return (
+            <article className="schedule-item-card" key={item.id} data-status={item.displayStatus}>
+              <div className="schedule-item-heading">
+                <div>
+                  <strong>{item.title}</strong>
+                  <span>{item.itemType}</span>
+                </div>
+                <StatusBadge status={item.displayStatus} />
+              </div>
+              <p>{item.description}</p>
+              <dl className="schedule-item-meta">
+                <div>
+                  <dt>期限</dt>
+                  <dd>{item.dueAt ? formatDate(item.dueAt.slice(0, 10)) : "指定なし"}</dd>
+                </div>
+                <div>
+                  <dt>遅延</dt>
+                  <dd>{item.isOverdue ? `${item.overdueDays}日` : "なし"}</dd>
+                </div>
+                <div>
+                  <dt>提出</dt>
+                  <dd>{evidence.join(" / ") || "記録"}</dd>
+                </div>
+              </dl>
+              {deliverables.length > 0 ? <p>成果物: {deliverables.join("、")}</p> : null}
+              {criteria.length > 0 ? <p>合格条件: {criteria.join("、")}</p> : null}
+              <div className="button-row">
+                {item.assignmentId ? (
+                  <button type="button" onClick={() => onOpenAssignment(item)}>
+                    課題詳細へ
+                  </button>
+                ) : null}
+                {item.sourceUrl ? (
+                  <a className="button-link secondary" href={item.sourceUrl} target="_blank" rel="noreferrer">
+                    根拠URL
+                  </a>
+                ) : null}
+                {canAdmin ? (
+                  <>
+                    <button type="button" onClick={() => onEditItem(item)}>
+                      編集に読み込む
+                    </button>
+                    <button type="button" onClick={() => onCancelItem(item.id)}>
+                      対象外
+                    </button>
+                    <button type="button" className="danger-action" onClick={() => onDeleteItem(item.id)}>
+                      削除
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+type ScheduleFormState = {
+  id: string;
+  date: string;
+  title: string;
+  description: string;
+  itemType: string;
+  priority: string;
+  dueAt: string;
+  sourceUrl: string;
+  isRequired: boolean;
+  statusOverride: string;
+  deliverables: string;
+  acceptanceCriteria: string;
+  allowedEvidenceTypes: string;
+};
+
+function emptyScheduleForm(date: string): ScheduleFormState {
+  return {
+    id: "",
+    date,
+    title: "",
+    description: "",
+    itemType: "milestone",
+    priority: "50",
+    dueAt: "",
+    sourceUrl: "",
+    isRequired: true,
+    statusOverride: "",
+    deliverables: "",
+    acceptanceCriteria: "",
+    allowedEvidenceTypes: "text",
+  };
+}
+
+function lines(value: string) {
+  return value
+    .split(/\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function formToScheduleInput(form: ScheduleFormState): ScheduleItemInput {
+  const metadata = {
+    deliverables: lines(form.deliverables),
+    acceptanceCriteria: lines(form.acceptanceCriteria),
+    allowedEvidenceTypes: lines(form.allowedEvidenceTypes),
+    nextAction: "Shomaが確認し、必要なら予定を調整する",
+  };
+  return {
+    date: form.date,
+    title: form.title,
+    description: form.description,
+    itemType: form.itemType,
+    priority: Number(form.priority),
+    dueAt: form.dueAt || null,
+    sourceUrl: form.sourceUrl || null,
+    isRequired: form.isRequired,
+    statusOverride: form.statusOverride || null,
+    metadata,
+  };
+}
+
+function ScheduleAdminPanel({
+  form,
+  selectedDate,
+  isSaving,
+  isMutating,
+  onChange,
+  onSubmit,
+  onReset,
+}: {
+  form: ScheduleFormState;
+  selectedDate: string;
+  isSaving: boolean;
+  isMutating: boolean;
+  onChange: (form: ScheduleFormState) => void;
+  onSubmit: () => void;
+  onReset: () => void;
+}) {
+  function update<K extends keyof ScheduleFormState>(key: K, value: ScheduleFormState[K]) {
+    onChange({ ...form, [key]: value });
+  }
+
+  return (
+    <section className="schedule-admin-panel" aria-labelledby="schedule-admin-title">
+      <div className="section-heading">
+        <p className="eyebrow">SHOMA CONTROL</p>
+        <h2 id="schedule-admin-title">スケジュール管理</h2>
+      </div>
+      <div className="schedule-admin-grid">
+        <label>
+          日付
+          <input type="date" value={form.date || selectedDate} onChange={(event) => update("date", event.target.value)} />
+        </label>
+        <label>
+          種別
+          <select value={form.itemType} onChange={(event) => update("itemType", event.target.value)}>
+            {["assignment", "exam", "application", "orientation", "housing", "finance", "travel", "piscine", "milestone", "rest", "review"].map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          優先度
+          <input type="number" min="1" max="100" value={form.priority} onChange={(event) => update("priority", event.target.value)} />
+        </label>
+        <label>
+          状態
+          <select value={form.statusOverride} onChange={(event) => update("statusOverride", event.target.value)}>
+            <option value="">自動判定</option>
+            <option value="not_started">未開始</option>
+            <option value="in_progress">進行中</option>
+            <option value="submitted">レビュー待ち</option>
+            <option value="revision_requested">修正依頼</option>
+            <option value="approved">合格</option>
+            <option value="cancelled">対象外</option>
+          </select>
+        </label>
+      </div>
+      <label>
+        タイトル
+        <input value={form.title} onChange={(event) => update("title", event.target.value)} />
+      </label>
+      <label>
+        説明
+        <textarea value={form.description} onChange={(event) => update("description", event.target.value)} />
+      </label>
+      <div className="schedule-admin-grid">
+        <label>
+          期限
+          <input value={form.dueAt} placeholder="2026-09-30T23:59:00+09:00" onChange={(event) => update("dueAt", event.target.value)} />
+        </label>
+        <label>
+          根拠URL
+          <input value={form.sourceUrl} onChange={(event) => update("sourceUrl", event.target.value)} />
+        </label>
+      </div>
+      <label>
+        成果物
+        <textarea value={form.deliverables} onChange={(event) => update("deliverables", event.target.value)} />
+      </label>
+      <label>
+        合格条件
+        <textarea value={form.acceptanceCriteria} onChange={(event) => update("acceptanceCriteria", event.target.value)} />
+      </label>
+      <label>
+        証跡種別
+        <input value={form.allowedEvidenceTypes} onChange={(event) => update("allowedEvidenceTypes", event.target.value)} />
+      </label>
+      <label className="checkbox-row">
+        <input type="checkbox" checked={form.isRequired} onChange={(event) => update("isRequired", event.target.checked)} />
+        必須予定として扱う
+      </label>
+      <div className="button-row">
+        <button type="button" className="primary-action" disabled={isSaving || !form.title} onClick={onSubmit}>
+          {form.id ? "更新" : "追加"}
+        </button>
+        <button type="button" disabled={isSaving || isMutating} onClick={onReset}>
+          入力をクリア
+        </button>
+      </div>
+      <p aria-live="polite">{isSaving ? "保存中です" : form.id ? "既存予定を編集中です" : "新しい予定を追加できます。"}</p>
+    </section>
+  );
+}
+
+function arrayMetadata(value: unknown) {
+  return Array.isArray(value) ? value.map(String) : [];
 }
 
 function MissionProgressCard({

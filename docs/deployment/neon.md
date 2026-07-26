@@ -7,7 +7,7 @@ Status: `taiga-nova-production` は作成済み。Alembic migration は head ま
 - Project: `taiga-nova-production`
 - Database: `taiga`
 - Role: `taiga`
-- Migration head: `0002_phase5_performance_indexes`
+- Migration head: `0003_schedule_calendar`
 
 接続文字列は secret なのでコミットしない。operator machine の gitignored env file にだけ保存する。
 
@@ -97,6 +97,33 @@ AUTHORIZED_USER_EMAILS=shomabirdie@icloud.com,taiga-albatross@softbank.ne.jp \
 ```
 
 `production-users` JSON は operator machine の未コミットファイルとして扱う。
+
+## Production curriculum seed
+
+本番の課題、週、試験、variant、feature flag、schedule item は `taiga.production_seed` で投入する。これは本番 2 ユーザーが bootstrap 済みであることを確認し、canonical curriculum の assignment と schedule item を `taiga-albatross@softbank.ne.jp` に割り当てる。local demo submission、runner job、exam attempt fixture は投入しない。
+
+```bash
+cd backend
+set -a
+source ../.env.neon.local
+set +a
+LOCAL_STORAGE_ROOT=../local-storage-production \
+CURRICULUM_SOURCE_DIR=../../design/taiga-42-v4.0-implementation-pack/curriculum \
+FRONTEND_ORIGINS=https://app.taiganova.app \
+CLOUDFLARE_ACCESS_TEAM_DOMAIN=https://taiganova.cloudflareaccess.com \
+CLOUDFLARE_ACCESS_AUD="<web-access-audience>" \
+AUTHORIZED_USER_EMAILS=shomabirdie@icloud.com,taiga-albatross@softbank.ne.jp \
+../.venv/bin/python -m taiga.production_seed
+```
+
+投入後の期待件数:
+
+- `weeks`: 28
+- `task_templates`: 196
+- `task_assignments` for `taiga-albatross@softbank.ne.jp`: 196
+- `exams`: 28
+- `exam_variants`: 56
+- `schedule_items`: 2026-07-27 から 2027-03-26 まで全日分
 
 ## Free tier 注意
 

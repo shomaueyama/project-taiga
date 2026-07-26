@@ -115,6 +115,119 @@ class AssignmentPage(BaseModel):
     nextCursor: str | None
 
 
+class ScheduleItemResponse(BaseModel):
+    id: UUID
+    scheduleKey: str
+    date: str
+    startAt: str | None
+    endAt: str | None
+    title: str
+    description: str
+    itemType: str
+    assignmentId: UUID | None
+    milestoneKey: str | None
+    priority: int
+    dueAt: str | None
+    sourceUrl: str | None
+    isRequired: bool
+    displayStatus: str
+    isOverdue: bool
+    overdueDays: int
+    isToday: bool
+    assignmentUrl: str | None
+    metadata: dict[str, Any]
+
+
+class ScheduleDayResponse(BaseModel):
+    date: str
+    representativeStatus: str
+    isToday: bool
+    items: list[ScheduleItemResponse]
+
+
+class SchedulePage(BaseModel):
+    fromDate: str
+    toDate: str
+    days: list[ScheduleDayResponse]
+
+
+class ScheduleSummary(BaseModel):
+    todayCount: int
+    learnerOverdueCount: int
+    reviewWaitingCount: int
+    nextImportantDate: str | None
+    nextImportantTitle: str | None
+    daysUntilPiscine: int
+
+
+class CreateScheduleItemRequest(StrictRequest):
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    title: str = Field(min_length=1, max_length=240)
+    description: str = Field(default="", max_length=4000)
+    itemType: Literal[
+        "assignment",
+        "exam",
+        "application",
+        "orientation",
+        "housing",
+        "finance",
+        "travel",
+        "piscine",
+        "milestone",
+        "rest",
+        "review",
+    ]
+    assignmentId: UUID | None = None
+    milestoneKey: str | None = Field(default=None, max_length=120)
+    statusOverride: Literal[
+        "not_started",
+        "in_progress",
+        "submitted",
+        "revision_requested",
+        "approved",
+        "cancelled",
+    ] | None = None
+    priority: int = Field(default=50, ge=1, le=100)
+    dueAt: str | None = Field(default=None, max_length=40)
+    sourceUrl: str | None = Field(default=None, max_length=2048)
+    isRequired: bool = True
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class UpdateScheduleItemRequest(StrictRequest):
+    date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    title: str | None = Field(default=None, min_length=1, max_length=240)
+    description: str | None = Field(default=None, max_length=4000)
+    itemType: Literal[
+        "assignment",
+        "exam",
+        "application",
+        "orientation",
+        "housing",
+        "finance",
+        "travel",
+        "piscine",
+        "milestone",
+        "rest",
+        "review",
+    ] | None = None
+    assignmentId: UUID | None = None
+    milestoneKey: str | None = Field(default=None, max_length=120)
+    statusOverride: Literal[
+        "not_started",
+        "in_progress",
+        "submitted",
+        "revision_requested",
+        "approved",
+        "cancelled",
+    ] | None = None
+    priority: int | None = Field(default=None, ge=1, le=100)
+    dueAt: str | None = Field(default=None, max_length=40)
+    sourceUrl: str | None = Field(default=None, max_length=2048)
+    isRequired: bool | None = None
+    metadata: dict[str, Any] | None = None
+
+
 class ExamSummary(BaseModel):
     id: UUID
     stableCode: str

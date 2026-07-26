@@ -26,8 +26,12 @@ async function watchPage(page: import("@playwright/test").Page) {
 
 async function openLocalMvp(page: import("@playwright/test").Page) {
   const errors = await watchPage(page);
+  await page.addInitScript(() => {
+    window.localStorage.setItem("taiga.localUser", "taiga@example.local");
+  });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "ダッシュボード" })).toBeVisible();
+  await page.waitForLoadState("networkidle");
   return errors;
 }
 
@@ -83,6 +87,41 @@ test("learner can view dashboard, assignments, disabled runner, and disabled exa
   await page.getByRole("link", { name: "試験" }).click();
   await expect(page.getByRole("button", { name: "試験を開始" })).toBeDisabled();
   await expect(page.getByText("試験結果はまだありません。")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("learner can use the schedule calendar and open a linked assignment", async ({ page }) => {
+  const errors = await openLocalMvp(page);
+  await page.getByLabel("ローカル利用者").selectOption("taiga@example.local");
+  await page.getByRole("link", { name: "スケジュール" }).click();
+  await expect(page.getByRole("heading", { name: "スケジュール" })).toBeVisible();
+  await expect(page.getByText("Piscineまで")).toBeVisible();
+  await page.getByRole("button", { name: "今日" }).click();
+  await expect(page.getByText("DAY DETAIL")).toBeVisible();
+  const detailButton = page.getByRole("button", { name: "課題詳細へ" }).first();
+  if (await detailButton.isVisible()) {
+    await detailButton.click();
+    await expect(page.getByRole("heading", { name: "課題" })).toBeVisible();
+  }
+  expect(errors).toEqual([]);
+});
+
+test("admin can manage schedule items for daily operation", async ({ page }) => {
+  const errors = await openLocalMvp(page);
+  await page.getByLabel("ローカル利用者").selectOption("admin@example.local");
+  await page.getByRole("link", { name: "スケジュール" }).click();
+  await expect(page.getByRole("heading", { name: "スケジュール管理" })).toBeVisible();
+  const title = `Shoma確認 ${Date.now()}`;
+  await page.getByLabel("タイトル").fill(title);
+  await page.getByLabel("説明").fill("実運用確認用の追加予定。");
+  await page.getByLabel("成果物").fill("確認結果");
+  await page.getByLabel("合格条件").fill("次の行動が決まる");
+  await page.getByRole("button", { name: "追加" }).click();
+  await expect(page.getByText(title)).toBeVisible();
+  await page.locator(".schedule-item-card", { hasText: title }).getByRole("button", { name: "編集に読み込む" }).click();
+  await expect(page.getByText("既存予定を編集中です")).toBeVisible();
+  await page.locator(".schedule-item-card", { hasText: title }).getByRole("button", { name: "対象外" }).click();
+  await expect(page.locator(".schedule-item-card", { hasText: title }).getByText("対象外")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
