@@ -339,11 +339,8 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "ダッシュボード" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "ローカルログイン" })).toBeInTheDocument();
     expect(screen.getAllByText("TAIGA NOVA").length).toBeGreaterThan(0);
-    expect(await screen.findByText("予定より遅れています")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "学習進捗" })).toHaveAttribute(
-      "aria-valuenow",
-      "0",
-    );
+    expect(await screen.findByRole("heading", { name: "基本情報試験まで" })).toBeInTheDocument();
+    expect(screen.getAllByText("69日").length).toBeGreaterThan(0);
     expect(await screen.findByText("正常")).toBeInTheDocument();
     expect(await screen.findByText("上山 虎雅 · 学習者")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "実行環境" }));
@@ -413,18 +410,14 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "課題" })).toBeInTheDocument();
   });
 
-  it("renders a neutral unknown mission progress state", async () => {
+  it("renders deadline and operating metrics without the old progress image", async () => {
     installFetch({ completedWeeks: null });
     renderApp();
 
-    expect(await screen.findByText("進捗状況を判定できません")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "学習進捗" })).not.toHaveAttribute(
-      "aria-valuenow",
-    );
-    expect(screen.getByRole("progressbar", { name: "学習進捗" })).toHaveAttribute(
-      "aria-valuetext",
-      "進捗は未判定です",
-    );
+    expect(await screen.findByRole("heading", { name: "基本情報試験まで" })).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar", { name: "学習進捗" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("運用指標")).toHaveTextContent("Piscineまで");
+    expect(screen.getByLabelText("運用指標")).toHaveTextContent("遅延");
   });
 
   it("renders the TAIGA NOVA off-orbit not found route", async () => {

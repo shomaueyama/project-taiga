@@ -8,6 +8,7 @@ import {
   Compass,
   GraduationCap,
   LayoutDashboard,
+  LogOut,
   Menu,
   PlayCircle,
   Settings,
@@ -53,7 +54,6 @@ import {
   type ScheduleItemInput,
 } from "../shared/api/client";
 import { formatDate, labelForRole, labelForStatus, shortId } from "../shared/labels";
-import { calculateMissionProgress, type MissionProgress } from "../shared/mission";
 import { Alert, EmptyState, LoadingState, PageHeader, StatusBadge } from "../shared/ui";
 
 type Role = "learner" | "reviewer" | "admin";
@@ -74,6 +74,8 @@ const NAV_ITEMS: NavItem[] = [
   { path: "/admin", label: "管理", roles: ["admin"], icon: Settings },
 ];
 const isProductionBuild = import.meta.env.PROD;
+const feExamDate = "2026-10-03";
+const piscineStartDate = "2027-03-01";
 
 function routeGroup(pathname: string) {
   if (pathname === "/") return "/dashboard";
@@ -144,7 +146,7 @@ export function App() {
   const scheduleSummary = useQuery({
     queryKey: ["schedule-summary", localUser],
     queryFn: getScheduleSummary,
-    enabled: isSignedIn && activeRoute === "/schedule",
+    enabled: isSignedIn && (activeRoute === "/dashboard" || activeRoute === "/schedule"),
   });
   const selectedAssignment =
     routeAssignmentId ?? selectedAssignmentId ?? assignments.data?.items[0]?.id ?? null;
@@ -313,7 +315,8 @@ export function App() {
   const examDisabled = !examEnabled;
   const availableNav = navItemsForEnvironment(isLocalEnvironment);
   const visibleNav = availableNav.filter((item) => item.roles.includes(me.data?.role ?? "learner"));
-  const missionProgress = calculateMissionProgress(progress.data?.completedWeeks);
+  const daysUntilFeExam = daysUntil(feExamDate);
+  const daysUntilPiscine = scheduleSummary.data?.daysUntilPiscine ?? daysUntil(piscineStartDate);
 
   useEffect(() => {
     document.title = `${routeTitle(location.pathname)} | TAIGA NOVA`;
@@ -451,35 +454,37 @@ export function App() {
           <section className="login-panel" aria-label="ログイン中の利用者">
             <h2>ログイン中</h2>
             <p>{me.data ? `${me.data.displayName} · ${labelForRole(me.data.role)}` : "Cloudflare Access"}</p>
+            <a className="button-link secondary logout-link" href="/cdn-cgi/access/logout">
+              <LogOut aria-hidden size={18} />
+              ログアウト
+            </a>
           </section>
         )}
       </aside>
 
       <div className="main-shell">
-        <header className="app-header">
-          <div>
-            <p className="eyebrow">TAIGA NOVA</p>
-            <p className="topbar-title">{routeTitle(location.pathname)}</p>
-          </div>
-          <dl className="status-grid" aria-label="サービス状態">
+        {isLocalEnvironment ? (
+          <header className="app-header">
             <div>
-              <dt>API</dt>
-              <dd>{health.isSuccess ? labelForStatus(health.data.status) : "確認中"}</dd>
+              <p className="eyebrow">TAIGA NOVA</p>
+              <p className="topbar-title">{routeTitle(location.pathname)}</p>
             </div>
-            {isLocalEnvironment ? (
-              <>
-                <div>
-                  <dt>実行環境</dt>
-                  <dd>{health.data?.runner_enabled ? "有効" : "停止中"}</dd>
-                </div>
-                <div>
-                  <dt>試験</dt>
-                  <dd>{health.data?.exam_enabled ? "有効" : "停止中"}</dd>
-                </div>
-              </>
-            ) : null}
-          </dl>
-        </header>
+            <dl className="status-grid" aria-label="サービス状態">
+              <div>
+                <dt>API</dt>
+                <dd>{health.isSuccess ? labelForStatus(health.data.status) : "確認中"}</dd>
+              </div>
+              <div>
+                <dt>実行環境</dt>
+                <dd>{health.data?.runner_enabled ? "有効" : "停止中"}</dd>
+              </div>
+              <div>
+                <dt>試験</dt>
+                <dd>{health.data?.exam_enabled ? "有効" : "停止中"}</dd>
+              </div>
+            </dl>
+          </header>
+        ) : null}
 
         <main id="main-content" className="main-content" tabIndex={-1}>
           {health.isPending ? (
@@ -504,9 +509,12 @@ export function App() {
                 description="学習の現在地、次に進む課題、運用状態を確認できます。"
                 titleId="dashboard-title"
               />
-              {dashboard.isLoading || progress.isLoading ? <LoadingState /> : null}
-              <MissionProgressCard
-                progress={missionProgress}
+              {dashboard.isLoading || progress.isLoading || scheduleSummary.isLoading ? <LoadingState /> : null}
+              <MissionReadinessCard
+                daysUntilFeExam={daysUntilFeExam}
+                daysUntilPiscine={daysUntilPiscine}
+                overdueCount={scheduleSummary.data?.learnerOverdueCount ?? 0}
+                reviewWaitingCount={scheduleSummary.data?.reviewWaitingCount ?? 0}
                 nextAction={firstAssignment?.title ?? "次の課題を確認"}
               />
               <section className="nova-card task-card" aria-labelledby="today-task-title">
@@ -533,10 +541,8 @@ export function App() {
               </section>
               <div className="card-grid dashboard-metrics">
                 <Metric label="完了週" value={progress.data?.completedWeeks ?? 0} />
-                {isLocalEnvironment ? (
-                  <Metric label="次の試験" value={dashboard.data?.nextExam?.stableCode ?? "予定なし"} />
-                ) : null}
-                <Metric label="ランク" value={progress.data?.rank ?? "未判定"} />
+                <Metric label="基本情報まで" value={`${daysUntilFeExam}日`} />
+                <Metric label="Piscineまで" value={`${daysUntilPiscine}日`} />
               </div>
               <Alert tone="info">TAIGA NOVAは直接URL、ブラウザ更新、戻る操作に対応しています。</Alert>
             </section>
@@ -828,14 +834,16 @@ export function App() {
                   value={labelForStatus(curriculumVersions.data?.items[0]?.status)}
                 />
               </div>
-              <ul className="flag-list" aria-label="機能フラグ">
-                {(featureFlags.data?.items ?? []).map((flag) => (
-                  <li key={flag.key}>
-                    {flag.key}: {flag.enabled ? "有効" : "停止中"}
-                  </li>
-                ))}
-                {!canAdmin ? <li>管理者権限が必要です</li> : null}
-              </ul>
+              {isLocalEnvironment ? (
+                <ul className="flag-list" aria-label="機能フラグ">
+                  {(featureFlags.data?.items ?? []).map((flag) => (
+                    <li key={flag.key}>
+                      {flag.key}: {flag.enabled ? "有効" : "停止中"}
+                    </li>
+                  ))}
+                  {!canAdmin ? <li>管理者権限が必要です</li> : null}
+                </ul>
+              ) : null}
             </section>
           ) : null}
 
@@ -893,6 +901,12 @@ function todayIsoDate() {
     day: "2-digit",
   });
   return formatter.format(new Date());
+}
+
+function daysUntil(targetIsoDate: string) {
+  const today = new Date(`${todayIsoDate()}T00:00:00+09:00`);
+  const target = new Date(`${targetIsoDate}T00:00:00+09:00`);
+  return Math.max(0, Math.ceil((target.getTime() - today.getTime()) / 86_400_000));
 }
 
 function startOfMonth(isoDate: string) {
@@ -1248,54 +1262,44 @@ function arrayMetadata(value: unknown) {
   return Array.isArray(value) ? value.map(String) : [];
 }
 
-function MissionProgressCard({
-  progress,
+function MissionReadinessCard({
+  daysUntilFeExam,
+  daysUntilPiscine,
+  overdueCount,
+  reviewWaitingCount,
   nextAction,
 }: {
-  progress: MissionProgress;
+  daysUntilFeExam: number;
+  daysUntilPiscine: number;
+  overdueCount: number;
+  reviewWaitingCount: number;
   nextAction: string;
 }) {
-  const percentage = progress.percentage ?? 0;
-
   return (
     <section
-      className={`mission-card mission-${progress.scheduleStatus}`}
+      className="mission-card readiness-card"
       aria-labelledby="mission-progress-title"
     >
       <div className="mission-content">
-        <p className="eyebrow">MISSION PROGRESS</p>
-        <h2 id="mission-progress-title">学習進捗</h2>
-        <div className="mission-number">
-          {progress.percentage === null ? "未判定" : `${progress.percentage}%`}
-        </div>
-        <div
-          className="progress-track"
-          role="progressbar"
-          aria-label="学習進捗"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={progress.percentage ?? undefined}
-          aria-valuetext={progress.percentage === null ? "進捗は未判定です" : `${percentage}%`}
-        >
-          <span style={{ width: `${percentage}%` }} />
-        </div>
-        <div className="mission-meta">
-          <StatusBadge status={progress.scheduleStatus} />
-          <span>{progress.message}</span>
-        </div>
-        <p>
-          {progress.completed === null
-            ? "進捗データが揃うと、完了数と予定との差分を表示します。"
-            : `${progress.completed} / ${progress.total} 週が完了しています。`}
-        </p>
+        <p className="eyebrow">NEXT DEADLINE</p>
+        <h2 id="mission-progress-title">基本情報試験まで</h2>
+        <div className="mission-number">{daysUntilFeExam}日</div>
+        <p>試験日: {formatDate(feExamDate)}</p>
         <p className="next-action">次の推奨アクション: {nextAction}</p>
       </div>
-      <div className="mission-visual">
-        {progress.imageSrc ? (
-          <img src={progress.imageSrc} alt={progress.imageAlt} width="360" height="360" />
-        ) : (
-          <img src={orbitIllustration} alt="" aria-hidden="true" width="220" height="160" />
-        )}
+      <div className="readiness-metrics" aria-label="運用指標">
+        <div>
+          <span>Piscineまで</span>
+          <strong>{daysUntilPiscine}日</strong>
+        </div>
+        <div>
+          <span>遅延</span>
+          <strong>{overdueCount}</strong>
+        </div>
+        <div>
+          <span>レビュー待ち</span>
+          <strong>{reviewWaitingCount}</strong>
+        </div>
       </div>
     </section>
   );
