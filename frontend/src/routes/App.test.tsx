@@ -293,15 +293,47 @@ function installFetch(
     if (path === "/api/v1/progress") {
       return response({ completedWeeks: options.completedWeeks ?? 0, capabilities: [], rank: null });
     }
+    if (path === "/api/v1/reviews/queue" && url.searchParams.get("status_filter") === "all") {
+      return response({
+        items: [
+          {
+            id: submissionId,
+            assignmentId,
+            assignmentTitle: "Typing basics",
+            assignmentStableCode: "TASK-001",
+            learnerName: "上山 虎雅",
+            version: 1,
+            status: "manual_review_pending",
+            createdAt: now,
+          },
+        ],
+        nextCursor: null,
+      });
+    }
     if (path === "/api/v1/reviews/queue") {
       return response({
-        items: [{ id: submissionId, assignmentId, version: 1, status: "manual_review_pending", createdAt: now }],
+        items: [
+          {
+            id: submissionId,
+            assignmentId,
+            assignmentTitle: "Typing basics",
+            assignmentStableCode: "TASK-001",
+            learnerName: "上山 虎雅",
+            version: 1,
+            status: "manual_review_pending",
+            createdAt: now,
+            submissionNote: "タイピング練習を完了しました。",
+          },
+        ],
         nextCursor: null,
       });
     }
     if (path === `/api/v1/submissions/${submissionId}/reviews`) {
       const result = body && typeof body === "object" && "result" in body ? body.result : "approved";
       return response({ id: reviewId, result, comment: "done", createdAt: now }, 201);
+    }
+    if (path === `/api/v1/submissions/${submissionId}` && method === "DELETE") {
+      return response(null, 204);
     }
     if (path === `/api/v1/submissions/${submissionId}/run`) {
       return response({ id: reviewId, submissionId, status: "succeeded", attempt: 1, sanitizedResult: { passed: true } });
@@ -552,12 +584,17 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("link", { name: "管理" }));
     expect(await screen.findByText("公開済み")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "レビュー" }));
+    expect(await screen.findByRole("heading", { name: "提出管理" })).toBeInTheDocument();
+    expect(screen.getByText("TASK-001 / 上山 虎雅 / v1")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: `${submissionId.slice(0, 8)}に修正依頼` }));
 
     expect(await screen.findByText("修正依頼")).toBeInTheDocument();
     expect(calls.find((call) => call.path.endsWith("/reviews"))?.body).toMatchObject({
       result: "needs_revision",
     });
+    fireEvent.click(screen.getByRole("button", { name: "提出を削除" }));
+    expect(await screen.findByText("削除済み")).toBeInTheDocument();
+    expect(calls.some((call) => call.path === `/api/v1/submissions/${submissionId}`)).toBe(true);
   });
 
   it("runs the server-authoritative exam flow only when enabled", async () => {

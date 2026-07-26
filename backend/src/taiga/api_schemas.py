@@ -86,6 +86,9 @@ class SubmissionResponse(BaseModel):
     version: int
     status: str
     createdAt: str
+    assignmentTitle: str | None = None
+    assignmentStableCode: str | None = None
+    learnerName: str | None = None
     repositoryUrl: str | None = None
     commitHash: str | None = None
     submissionNote: str | None = None

@@ -22,7 +22,7 @@ from taiga.api_schemas import (
     UploadSessionResponse,
 )
 from taiga.auth import Principal
-from taiga.authorization import is_reviewer, require_reviewer
+from taiga.authorization import is_reviewer, require_admin, require_reviewer
 from taiga.config import get_settings
 from taiga.errors import ConflictError, NotFoundError
 from taiga.state_transitions import (
@@ -73,6 +73,9 @@ def _submission(row: Any) -> SubmissionResponse:
         version=row["submission_version"],
         status=row["status"],
         createdAt=row["created_at"].isoformat(),
+        assignmentTitle=row.get("assignment_title"),
+        assignmentStableCode=row.get("assignment_stable_code"),
+        learnerName=row.get("learner_name"),
         repositoryUrl=row.get("repository_url"),
         commitHash=row.get("commit_hash"),
         submissionNote=(row.get("artifact_manifest_json") or {}).get("submissionNote"),
@@ -595,13 +598,23 @@ def get_submission_artifact_content(
     )
 
 
-def review_queue(session: Session, principal: Principal, limit: int = 20) -> ReviewQueuePage:
+def review_queue(
+    session: Session,
+    principal: Principal,
+    limit: int = 20,
+    status_filter: str = "manual_review_pending",
+) -> ReviewQueuePage:
     require_reviewer(principal)
+    allowed_statuses = {"all", "manual_review_pending", "approved", "needs_revision"}
+    if status_filter not in allowed_statuses:
+        raise ValueError("Invalid submission status filter")
     rows = (
         session.execute(
             text(
                 """
                 SELECT s.id, s.assignment_id, s.submission_version, s.status::text, s.created_at,
+                       tt.title AS assignment_title, tt.stable_code AS assignment_stable_code,
+                       u.display_name AS learner_name,
                        s.repository_url, s.commit_hash, s.artifact_manifest_json,
                        COALESCE(
                            (
@@ -628,17 +641,109 @@ def review_queue(session: Session, principal: Principal, limit: int = 20) -> Rev
                            '[]'::jsonb
                        ) AS artifact_links
                 FROM submissions s
-                WHERE s.status = 'manual_review_pending'
+                JOIN task_assignments ta ON ta.id = s.assignment_id
+                JOIN task_templates tt ON tt.id = ta.task_template_id
+                JOIN users u ON u.id = s.learner_id
+                WHERE (:status_filter = 'all' OR s.status::text = :status_filter)
                 ORDER BY s.created_at DESC
                 LIMIT :limit
                 """
             ),
-            {"limit": limit},
+            {"limit": limit, "status_filter": status_filter},
         )
         .mappings()
         .all()
     )
     return ReviewQueuePage(items=[_submission(row) for row in rows], nextCursor=None)
+
+
+def delete_submission(
+    session: Session,
+    principal: Principal,
+    submission_id: uuid.UUID,
+) -> None:
+    require_admin(principal)
+    row = (
+        session.execute(
+            text(
+                """
+                SELECT id, assignment_id
+                FROM submissions
+                WHERE id = :id
+                FOR UPDATE
+                """
+            ),
+            {"id": submission_id},
+        )
+        .mappings()
+        .first()
+    )
+    if row is None:
+        raise NotFoundError("Submission not found", code="submission_not_found")
+    assignment_id = row["assignment_id"]
+    session.execute(
+        text(
+            """
+            DELETE FROM notifications
+            WHERE entity_type = 'submission' AND entity_id = :submission_id
+            """
+        ),
+        {"submission_id": submission_id},
+    )
+    session.execute(text("DELETE FROM reviews WHERE submission_id = :submission_id"), {"submission_id": submission_id})
+    session.execute(text("DELETE FROM runner_jobs WHERE submission_id = :submission_id"), {"submission_id": submission_id})
+    session.execute(
+        text("DELETE FROM submission_artifacts WHERE submission_id = :submission_id"),
+        {"submission_id": submission_id},
+    )
+    session.execute(text("DELETE FROM submissions WHERE id = :submission_id"), {"submission_id": submission_id})
+    latest_status = session.execute(
+        text(
+            """
+            SELECT status::text
+            FROM submissions
+            WHERE assignment_id = :assignment_id
+            ORDER BY submission_version DESC
+            LIMIT 1
+            """
+        ),
+        {"assignment_id": assignment_id},
+    ).scalar_one_or_none()
+    assignment_status = {
+        "approved": "completed",
+        "needs_revision": "in_progress",
+        "manual_review_pending": "awaiting_submission",
+        None: "awaiting_submission",
+    }.get(latest_status, "in_progress")
+    session.execute(
+        text(
+            """
+            UPDATE task_assignments
+            SET status = :status, updated_at = now(), version = version + 1
+            WHERE id = :assignment_id
+            """
+        ),
+        {"assignment_id": assignment_id, "status": assignment_status},
+    )
+    session.execute(
+        text(
+            """
+            INSERT INTO audit_events (
+                id, actor_id, actor_role, action, entity_type, entity_id, outcome
+            )
+            VALUES (
+                :id, :actor_id, :actor_role, 'submission.delete', 'submission',
+                :entity_id, 'success'
+            )
+            """
+        ),
+        {
+            "id": uuid.uuid4(),
+            "actor_id": principal.id,
+            "actor_role": principal.role,
+            "entity_id": submission_id,
+        },
+    )
 
 
 def create_review(

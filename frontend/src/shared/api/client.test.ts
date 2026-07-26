@@ -5,6 +5,7 @@ import {
   apiErrorMessage,
   createDemoSubmission,
   createExamAttempt,
+  deleteSubmission,
   getAdminUsers,
   getAnalytics,
   getAssignment,
@@ -17,6 +18,7 @@ import {
   getMe,
   getProgress,
   getReviewQueue,
+  getReviewSubmissions,
   getStoredLocalUser,
   reviewSubmission,
   runSubmission,
@@ -124,9 +126,27 @@ describe("api client", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
-        const path = new URL(String(input)).pathname;
+        const url = new URL(String(input));
+        const path = url.pathname;
         if (path === "/api/v1/missing") {
           return jsonResponse({ error: "missing" }, 404);
+        }
+        if (path === "/api/v1/reviews/queue" && url.searchParams.get("status_filter") === "all") {
+          return jsonResponse({
+            items: [
+              {
+                id: uuid2,
+                assignmentId: uuid1,
+                assignmentTitle: "Task",
+                assignmentStableCode: "TASK-001",
+                learnerName: "Learner",
+                version: 1,
+                status: "approved",
+                createdAt: now,
+              },
+            ],
+            nextCursor: null,
+          });
         }
         return jsonResponse(responses[path]);
       }),
@@ -138,6 +158,7 @@ describe("api client", () => {
     await expect(getAssignment(uuid1)).resolves.toMatchObject({ instructions: ["Read"] });
     await expect(getProgress()).resolves.toMatchObject({ completedWeeks: 1 });
     await expect(getReviewQueue()).resolves.toMatchObject({ items: [{ status: "manual_review_pending" }] });
+    await expect(getReviewSubmissions()).resolves.toMatchObject({ items: [{ assignmentTitle: "Task" }] });
     await expect(getExams()).resolves.toMatchObject({ items: [{ stableCode: "EXAM-001" }] });
     await expect(getAdminUsers()).resolves.toMatchObject({ items: [{ role: "admin" }] });
     await expect(getFeatureFlags()).resolves.toMatchObject({ items: [{ key: "runner.enabled" }] });
@@ -172,6 +193,9 @@ describe("api client", () => {
         if (path === `/api/v1/submissions/${uuid3}/reviews`) {
           return jsonResponse({ id: uuid1, result: "approved", comment: "ok", createdAt: now }, 201);
         }
+        if (path === `/api/v1/submissions/${uuid3}` && init?.method === "DELETE") {
+          return jsonResponse(null, 204);
+        }
         if (path === `/api/v1/exams/${uuid2}/attempts`) {
           return jsonResponse({ id: uuid1, examId: uuid2, status: "reserved", attemptNumber: 1 }, 201);
         }
@@ -202,12 +226,14 @@ describe("api client", () => {
     await expect(createDemoSubmission(uuid2)).resolves.toMatchObject({ id: uuid3, version: 1 });
     await expect(runSubmission(uuid3)).resolves.toMatchObject({ status: "succeeded" });
     await expect(reviewSubmission(uuid3, "approved")).resolves.toMatchObject({ result: "approved" });
+    await expect(deleteSubmission(uuid3)).resolves.toBeUndefined();
     await expect(createExamAttempt(uuid2)).resolves.toMatchObject({ status: "reserved" });
     await expect(startExamAttempt(uuid1)).resolves.toMatchObject({ attempt: { status: "in_progress" } });
     await expect(submitExamAttempt(uuid1)).resolves.toMatchObject({ attempt: { status: "oral_pending" } });
 
     expect(calls.every((call) => call.key === "idempotency-key")).toBe(true);
     expect(calls.map((call) => call.path)).toContain(`/api/v1/submissions/${uuid3}/reviews`);
+    expect(calls.map((call) => call.path)).toContain(`/api/v1/submissions/${uuid3}`);
     expect(calls.find((call) => call.path.endsWith("/reviews"))?.body).toMatchObject({
       result: "approved",
     });

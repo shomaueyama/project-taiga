@@ -396,8 +396,33 @@ def test_review_updates_assignment_and_resubmission_increments_version(
         {"id": UUID(assignment_id)},
     )
     assert completed_status == "completed"
+    reviewed_list = client.get(
+        "/api/v1/reviews/queue?status_filter=approved",
+        headers=headers("reviewer@example.local"),
+    )
+    assert reviewed_list.status_code == 200
+    reviewed_item = next(
+        item for item in reviewed_list.json()["items"] if item["id"] == second["id"]
+    )
+    assert reviewed_item["assignmentTitle"]
+    assert reviewed_item["assignmentStableCode"]
+    assert reviewed_item["learnerName"]
     duplicate = review(client, second["id"], "approved")
     assert duplicate.status_code == 409
+    learner_delete = client.delete(
+        f"/api/v1/submissions/{second['id']}",
+        headers=headers(),
+    )
+    assert learner_delete.status_code == 403
+    admin_delete = client.delete(
+        f"/api/v1/submissions/{second['id']}",
+        headers=headers("admin@example.local"),
+    )
+    assert admin_delete.status_code == 204
+    assert scalar(
+        "SELECT count(*) FROM submissions WHERE id = :id",
+        {"id": UUID(second["id"])},
+    ) == 0
 
 
 def test_concurrent_submission_versions_are_unique(seeded: None) -> None:

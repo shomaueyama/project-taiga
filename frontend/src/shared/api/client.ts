@@ -187,6 +187,9 @@ const submissionSchema = z.object({
   version: z.number(),
   status: z.string(),
   createdAt: z.string(),
+  assignmentTitle: z.string().nullable().optional(),
+  assignmentStableCode: z.string().nullable().optional(),
+  learnerName: z.string().nullable().optional(),
   repositoryUrl: z.string().nullable().optional(),
   commitHash: z.string().nullable().optional(),
   submissionNote: z.string().nullable().optional(),
@@ -536,6 +539,10 @@ export function getReviewQueue(): Promise<ReviewQueue> {
   return apiGet("/reviews/queue", reviewQueueSchema);
 }
 
+export function getReviewSubmissions(status = "all"): Promise<ReviewQueue> {
+  return apiGet(`/reviews/queue?status_filter=${encodeURIComponent(status)}`, reviewQueueSchema);
+}
+
 export async function createDemoSubmission(assignmentId: string): Promise<Submission> {
   const sha256 = "a".repeat(64);
   const upload = await apiPost(
@@ -652,6 +659,10 @@ export function reviewSubmission(
     },
     reviewSchema,
   );
+}
+
+export function deleteSubmission(submissionId: string): Promise<void> {
+  return apiDelete(`/submissions/${submissionId}`);
 }
 
 export function createExamAttempt(examId: string): Promise<ExamAttempt> {

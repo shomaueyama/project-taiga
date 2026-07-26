@@ -26,6 +26,7 @@ export const statusLabels: Record<string, string> = {
   needs_revision: "修正依頼",
   approved: "承認済み",
   cancelled: "対象外",
+  deleted: "削除済み",
   event: "予定",
   succeeded: "完了",
   failed: "失敗",

@@ -114,6 +114,7 @@ from taiga.submission_service import (
     create_review,
     create_submission,
     create_upload,
+    delete_submission,
     get_submission_artifact_content,
     get_submission_detail,
     get_upload,
@@ -455,14 +456,17 @@ def submission_artifact_content(
 def queue(
     response: Response,
     limit: int = list_limit_query,
+    status_filter: str = "manual_review_pending",
     principal: Principal = principal_dependency,
     session: Session = session_dependency,
 ) -> ReviewQueuePage:
     try:
-        return review_queue(session, principal, min(limit, 100))
+        return review_queue(session, principal, min(limit, 100), status_filter)
     except PermissionError as exc:
         response.status_code = status.HTTP_403_FORBIDDEN
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.post(
@@ -486,6 +490,25 @@ def review_submission(
         raise HTTPException(status_code=404, detail="Submission not found") from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.delete(
+    "/api/v1/submissions/{submissionId}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["submissions"],
+)
+def remove_submission(
+    submission_id: UUID = submission_id_path,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> None:
+    try:
+        delete_submission(session, principal, submission_id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Submission not found") from exc
 
 
 @app.post(

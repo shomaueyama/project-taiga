@@ -27,6 +27,7 @@ import {
   createDemoSubmission,
   createScheduleItem,
   createExamAttempt,
+  deleteSubmission,
   deleteScheduleItem,
   apiErrorMessage,
   getAssignments,
@@ -41,6 +42,7 @@ import {
   getMe,
   getProgress,
   getReviewQueue,
+  getReviewSubmissions,
   getSchedule,
   getScheduleDay,
   getScheduleSummary,
@@ -128,6 +130,7 @@ export function App() {
   });
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [reviewStatusFilter, setReviewStatusFilter] = useState("all");
 
   const health = useQuery({ queryKey: ["health"], queryFn: getHealth });
   const me = useQuery({ queryKey: ["me", localUser], queryFn: getMe });
@@ -194,6 +197,12 @@ export function App() {
     enabled: canReview,
     retry: false,
   });
+  const reviewSubmissions = useQuery({
+    queryKey: ["review-submissions", localUser, reviewStatusFilter],
+    queryFn: () => getReviewSubmissions(reviewStatusFilter),
+    enabled: canReview,
+    retry: false,
+  });
   const examEnabled = health.data?.exam_enabled === true;
   const exams = useQuery({
     queryKey: ["exams", localUser],
@@ -256,6 +265,21 @@ export function App() {
     onSuccess: async (review) => {
       setLastReviewResult(review.result);
       await queryClient.invalidateQueries({ queryKey: ["review-queue", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["review-submissions", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["assignments", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["assignment-detail", localUser] });
+    },
+  });
+  const removeReviewedSubmission = useMutation({
+    mutationFn: (submissionId: string) => deleteSubmission(submissionId),
+    onSuccess: async () => {
+      setLastReviewResult("deleted");
+      await queryClient.invalidateQueries({ queryKey: ["review-queue", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["review-submissions", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["assignments", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["assignment-detail", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["schedule-summary", localUser] });
     },
   });
   const runExamFlow = useMutation({
@@ -1028,20 +1052,37 @@ export function App() {
             <section className="page-stack" aria-labelledby="reviews-title">
               <PageHeader
                 eyebrow="REVIEW ORBIT"
-                title="レビュー"
-                description="提出物を確認し、承認または修正依頼を記録します。"
+                title="提出管理"
+                description="提出内容、レビュー状態、添付を確認し、必要なものだけ承認・修正依頼・削除します。"
                 titleId="reviews-title"
               />
               {!canReview ? <Alert tone="warning">レビューにはレビュアー以上の権限が必要です。</Alert> : null}
-              {reviewQueue.isLoading ? <LoadingState label="レビュー待ちを読み込み中です" /> : null}
-              <div className="metric-row">
-                <span>レビュー待ち</span>
-                <strong>{reviewQueue.data?.items.length ?? 0}</strong>
+              {reviewSubmissions.isLoading ? <LoadingState label="提出一覧を読み込み中です" /> : null}
+              <div className="review-toolbar">
+                <div className="metric-row">
+                  <span>レビュー待ち</span>
+                  <strong>{reviewQueue.data?.items.length ?? 0}</strong>
+                </div>
+                <label>
+                  表示
+                  <select
+                    value={reviewStatusFilter}
+                    onChange={(event) => setReviewStatusFilter(event.target.value)}
+                  >
+                    <option value="all">全提出</option>
+                    <option value="manual_review_pending">レビュー待ち</option>
+                    <option value="approved">承認済み</option>
+                    <option value="needs_revision">修正依頼</option>
+                  </select>
+                </label>
               </div>
-              {(reviewQueue.data?.items ?? []).slice(0, 5).map((submission) => (
+              {(reviewSubmissions.data?.items ?? []).slice(0, 20).map((submission) => (
                 <article className="review-row" key={submission.id}>
                   <div>
-                    <strong>提出 {shortId(submission.id)}</strong>
+                    <strong>{submission.assignmentTitle ?? `提出 ${shortId(submission.id)}`}</strong>
+                    <p>
+                      {(submission.assignmentStableCode ?? "課題")} / {submission.learnerName ?? "学習者"} / v{submission.version}
+                    </p>
                     <StatusBadge status={submission.status} />
                     {submission.repositoryUrl ? (
                       <a href={submission.repositoryUrl} target="_blank" rel="noreferrer">
@@ -1072,7 +1113,11 @@ export function App() {
                   <div className="button-row">
                     <button
                       type="button"
-                      disabled={!canReview || reviewPendingSubmission.isPending}
+                      disabled={
+                        !canReview ||
+                        submission.status !== "manual_review_pending" ||
+                        reviewPendingSubmission.isPending
+                      }
                       onClick={() =>
                         reviewPendingSubmission.mutate({
                           submissionId: submission.id,
@@ -1085,7 +1130,11 @@ export function App() {
                     <button
                       type="button"
                       className="danger-action"
-                      disabled={!canReview || reviewPendingSubmission.isPending}
+                      disabled={
+                        !canReview ||
+                        submission.status !== "manual_review_pending" ||
+                        reviewPendingSubmission.isPending
+                      }
                       onClick={() =>
                         reviewPendingSubmission.mutate({
                           submissionId: submission.id,
@@ -1095,11 +1144,21 @@ export function App() {
                     >
                       {shortId(submission.id)}に修正依頼
                     </button>
+                    {canAdmin ? (
+                      <button
+                        type="button"
+                        className="danger-action"
+                        disabled={removeReviewedSubmission.isPending}
+                        onClick={() => removeReviewedSubmission.mutate(submission.id)}
+                      >
+                        提出を削除
+                      </button>
+                    ) : null}
                   </div>
                 </article>
               ))}
-              {canReview && reviewQueue.data?.items.length === 0 ? (
-                <EmptyState title="レビュー待ちの提出はありません。" />
+              {canReview && reviewSubmissions.data?.items.length === 0 ? (
+                <EmptyState title="表示できる提出はありません。" />
               ) : null}
               <p aria-live="polite">
                 {lastReviewResult ? labelForStatus(lastReviewResult) : "レビュー操作はまだありません。"}
