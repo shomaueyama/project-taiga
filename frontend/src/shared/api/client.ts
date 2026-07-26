@@ -13,6 +13,7 @@ const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 const apiBaseUrl = resolveApiBaseUrl(configuredApiBaseUrl);
 const authStorageKey = "taiga.localUser";
 const requestTimeoutMs = 20_000;
+const useLocalAuth = !import.meta.env.PROD;
 
 export class ApiError extends Error {
   constructor(
@@ -267,6 +268,10 @@ export function setStoredLocalUser(email: string): void {
   window.localStorage.setItem(authStorageKey, email);
 }
 
+function authHeaders(): HeadersInit {
+  return useLocalAuth ? { Authorization: `Bearer local:${getStoredLocalUser()}` } : {};
+}
+
 async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), requestTimeoutMs);
@@ -284,7 +289,8 @@ async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit): P
 
 async function apiGet<T>(path: string, schema: z.ZodType<T>): Promise<T> {
   const response = await fetchWithTimeout(`${apiBaseUrl}/api/v1${path}`, {
-    headers: { Authorization: `Bearer local:${getStoredLocalUser()}` },
+    credentials: "include",
+    headers: authHeaders(),
   });
   if (!response.ok) {
     throw new ApiError(`API request failed: ${response.status}`, response.status);
@@ -295,8 +301,9 @@ async function apiGet<T>(path: string, schema: z.ZodType<T>): Promise<T> {
 async function apiPost<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
   const response = await fetchWithTimeout(`${apiBaseUrl}/api/v1${path}`, {
     method: "POST",
+    credentials: "include",
     headers: {
-      Authorization: `Bearer local:${getStoredLocalUser()}`,
+      ...authHeaders(),
       "Content-Type": "application/json",
       "Idempotency-Key": crypto.randomUUID(),
     },
@@ -311,8 +318,9 @@ async function apiPost<T>(path: string, body: unknown, schema: z.ZodType<T>): Pr
 async function apiPatch<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
   const response = await fetchWithTimeout(`${apiBaseUrl}/api/v1${path}`, {
     method: "PATCH",
+    credentials: "include",
     headers: {
-      Authorization: `Bearer local:${getStoredLocalUser()}`,
+      ...authHeaders(),
       "Content-Type": "application/json",
       "Idempotency-Key": crypto.randomUUID(),
     },
@@ -327,8 +335,9 @@ async function apiPatch<T>(path: string, body: unknown, schema: z.ZodType<T>): P
 async function apiDelete(path: string): Promise<void> {
   const response = await fetchWithTimeout(`${apiBaseUrl}/api/v1${path}`, {
     method: "DELETE",
+    credentials: "include",
     headers: {
-      Authorization: `Bearer local:${getStoredLocalUser()}`,
+      ...authHeaders(),
       "Idempotency-Key": crypto.randomUUID(),
     },
   });

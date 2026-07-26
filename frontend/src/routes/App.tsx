@@ -73,6 +73,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: "/exams", label: "試験", roles: ["learner", "admin"], icon: GraduationCap },
   { path: "/admin", label: "管理", roles: ["admin"], icon: Settings },
 ];
+const isProductionBuild = import.meta.env.PROD;
 
 function routeGroup(pathname: string) {
   if (pathname === "/") return "/dashboard";
@@ -109,6 +110,7 @@ export function App() {
 
   const health = useQuery({ queryKey: ["health"], queryFn: getHealth });
   const me = useQuery({ queryKey: ["me", localUser], queryFn: getMe });
+  const isLocalEnvironment = !isProductionBuild && health.data?.app_env !== "production";
   const isSignedIn = me.isSuccess;
   const canReview = me.data?.role === "reviewer" || me.data?.role === "admin";
   const canAdmin = me.data?.role === "admin";
@@ -422,21 +424,28 @@ export function App() {
             );
           })}
         </nav>
-        <section className="login-panel" aria-labelledby="local-login-title">
-          <h2 id="local-login-title">ローカルログイン</h2>
-          <label htmlFor="local-user">利用者</label>
-          <select
-            id="local-user"
-            aria-label="ローカル利用者"
-            value={localUser}
-            onChange={(event) => handleLocalUserChange(event.target.value)}
-          >
-            <option value="taiga@example.local">taiga@example.local</option>
-            <option value="reviewer@example.local">reviewer@example.local</option>
-            <option value="admin@example.local">admin@example.local</option>
-          </select>
-          <p>{me.data ? `${me.data.displayName} · ${labelForRole(me.data.role)}` : "未認証"}</p>
-        </section>
+        {isLocalEnvironment ? (
+          <section className="login-panel" aria-labelledby="local-login-title">
+            <h2 id="local-login-title">ローカルログイン</h2>
+            <label htmlFor="local-user">利用者</label>
+            <select
+              id="local-user"
+              aria-label="ローカル利用者"
+              value={localUser}
+              onChange={(event) => handleLocalUserChange(event.target.value)}
+            >
+              <option value="taiga@example.local">taiga@example.local</option>
+              <option value="reviewer@example.local">reviewer@example.local</option>
+              <option value="admin@example.local">admin@example.local</option>
+            </select>
+            <p>{me.data ? `${me.data.displayName} · ${labelForRole(me.data.role)}` : "未認証"}</p>
+          </section>
+        ) : (
+          <section className="login-panel" aria-label="ログイン中の利用者">
+            <h2>ログイン中</h2>
+            <p>{me.data ? `${me.data.displayName} · ${labelForRole(me.data.role)}` : "Cloudflare Access"}</p>
+          </section>
+        )}
       </aside>
 
       <div className="main-shell">
