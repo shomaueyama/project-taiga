@@ -55,16 +55,13 @@ def load_specs(path: Path) -> tuple[ProductionUserSpec, ...]:
 
 
 def validate_specs(settings: Settings, specs: tuple[ProductionUserSpec, ...]) -> None:
-    if len(specs) < 2:
-        raise ValueError("At least two production users must be provided")
+    if len(specs) != 2:
+        raise ValueError("Exactly two production users must be provided")
     emails = [spec.email for spec in specs]
     if len(set(emails)) != len(emails):
         raise ValueError("Production user emails must be unique")
     if set(emails) != settings.authorized_email_set:
         raise ValueError("Production user emails must match AUTHORIZED_USER_EMAILS exactly")
-    roles = {spec.role for spec in specs}
-    if "admin" not in roles or "learner" not in roles:
-        raise ValueError("Production users must include at least one admin and one learner")
     for spec in specs:
         if spec.role not in VALID_ROLES:
             raise ValueError(f"Unsupported production user role: {spec.role}")

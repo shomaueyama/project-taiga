@@ -124,8 +124,8 @@ class Settings(BaseSettings):
             raise ValueError("CLOUDFLARE_ACCESS_TEAM_DOMAIN is required in production")
         if not self.cloudflare_access_aud:
             raise ValueError("CLOUDFLARE_ACCESS_AUD is required in production")
-        if len(self.authorized_email_set) < 2:
-            raise ValueError("AUTHORIZED_USER_EMAILS must contain at least two production users")
+        if len(self.authorized_email_set) != 2:
+            raise ValueError("AUTHORIZED_USER_EMAILS must contain exactly two production users")
         return self
 
     @property

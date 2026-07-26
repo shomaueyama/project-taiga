@@ -30,7 +30,7 @@ def production_settings() -> Settings:
         RUNNER_ENABLED=False,
         CLOUDFLARE_ACCESS_TEAM_DOMAIN=TEAM_DOMAIN,
         CLOUDFLARE_ACCESS_AUD=AUDIENCE,
-        AUTHORIZED_USER_EMAILS="shoma@example.com,taiga@example.com,jiemashangshan@gmail.com",
+        AUTHORIZED_USER_EMAILS="shoma@example.com,taiga@example.com",
     )
 
 
@@ -143,9 +143,9 @@ def test_production_config_rejects_unsafe_values() -> None:
             RUNNER_ENABLED=True,
             CLOUDFLARE_ACCESS_TEAM_DOMAIN=TEAM_DOMAIN,
             CLOUDFLARE_ACCESS_AUD=AUDIENCE,
-            AUTHORIZED_USER_EMAILS="shoma@example.com,taiga@example.com,jiemashangshan@gmail.com",
+            AUTHORIZED_USER_EMAILS="shoma@example.com,taiga@example.com",
         )
-    with pytest.raises(ValueError, match="at least two"):
+    with pytest.raises(ValueError, match="exactly two"):
         Settings(
             APP_ENV="production",
             LOCAL_AUTH_ENABLED=False,
@@ -163,7 +163,7 @@ def test_production_config_rejects_unsafe_values() -> None:
             FRONTEND_ORIGINS=APP_ORIGIN,
             CLOUDFLARE_ACCESS_TEAM_DOMAIN=TEAM_DOMAIN,
             CLOUDFLARE_ACCESS_AUD=AUDIENCE,
-            AUTHORIZED_USER_EMAILS="shoma@example.com,taiga@example.com,jiemashangshan@gmail.com",
+            AUTHORIZED_USER_EMAILS="shoma@example.com,taiga@example.com",
         )
 
 
@@ -177,10 +177,7 @@ def test_public_health_is_limited_and_protected_paths_require_access(
     monkeypatch.setenv("RUNNER_ENABLED", "false")
     monkeypatch.setenv("CLOUDFLARE_ACCESS_TEAM_DOMAIN", TEAM_DOMAIN)
     monkeypatch.setenv("CLOUDFLARE_ACCESS_AUD", AUDIENCE)
-    monkeypatch.setenv(
-        "AUTHORIZED_USER_EMAILS",
-        "shoma@example.com,taiga@example.com,jiemashangshan@gmail.com",
-    )
+    monkeypatch.setenv("AUTHORIZED_USER_EMAILS", "shoma@example.com,taiga@example.com")
     get_settings.cache_clear()
     try:
         client = TestClient(app)
