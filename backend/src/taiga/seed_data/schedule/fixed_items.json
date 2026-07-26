@@ -2,26 +2,26 @@
   {
     "key": "taiga-2026-07-27-fe-baseline",
     "date": "2026-07-27",
-    "title": "基本情報：現在地確認",
-    "description": "科目A相当20問、科目B相当5問を実施し、正答数、分からなかった用語、10月3日に合格する意思を提出する。",
+    "title": "基本情報：既習範囲の確認",
+    "description": "すでに進めている学習を前提に、ハードウェア範囲の残り、分からない用語、10月3日に向けた現在地を記録する。",
     "itemType": "assignment",
     "priority": 10,
     "dueTime": "23:59",
     "allowedEvidenceTypes": ["screenshot", "photo", "text"],
-    "deliverables": ["科目A相当20問の回答画面", "科目B相当5問の回答画面", "正答数", "分からなかった用語一覧", "10月3日に合格する意思"],
-    "acceptanceCriteria": ["指定数の問題を実施", "結果が判読可能", "分からない項目を隠していない", "Shomaが承認"]
+    "deliverables": ["ハードウェア範囲の残り", "分からなかった用語一覧", "明日終わらせる範囲"],
+    "acceptanceCriteria": ["既習範囲が分かる", "分からない項目を隠していない", "Shomaが承認"]
   },
   {
     "key": "taiga-2026-07-28-computer-components",
     "date": "2026-07-28",
-    "title": "コンピュータの基本構成",
-    "description": "CPU、メモリ、ストレージ、OSをそれぞれ100字以内で自分の言葉で説明する。",
+    "title": "ハードウェア範囲を完了",
+    "description": "CPU、メモリ、ストレージ、入出力装置、OSとの関係を確認し、ハードウェア範囲を終える。",
     "itemType": "assignment",
     "priority": 10,
     "dueTime": "23:59",
     "allowedEvidenceTypes": ["screenshot", "photo", "text"],
-    "deliverables": ["4項目の説明画像またはテキスト"],
-    "acceptanceCriteria": ["4項目すべて提出", "丸写しではない", "Shomaの追加質問に回答", "Shomaが承認"]
+    "deliverables": ["ハードウェア範囲の完了メモ", "分からなかった用語", "確認問題の結果"],
+    "acceptanceCriteria": ["主要部品の役割を説明できる", "分からない用語が回収されている", "Shomaが承認"]
   },
   {
     "key": "taiga-2026-07-29-binary-decimal",
@@ -124,6 +124,18 @@
     "description": "予定あり。翌日の未完了回収に影響しないよう前日までに必須課題を確認する。",
     "itemType": "milestone",
     "priority": 20
+  },
+  {
+    "key": "taiga-2026-09-07-42-web-test",
+    "date": "2026-09-07",
+    "title": "42 Tokyo Webテスト",
+    "description": "42 Tokyo出願フローのWebテストを受け、結果と次の手続きを記録する。",
+    "itemType": "application",
+    "priority": 5,
+    "sourceUrl": "https://apply.42tokyo.jp/users/sign_up",
+    "allowedEvidenceTypes": ["screenshot", "photo", "text"],
+    "deliverables": ["Webテスト実施記録", "結果", "次の手続き"],
+    "acceptanceCriteria": ["実施日と結果が分かる", "次に必要な手続きが分かる"]
   },
   {
     "key": "taiga-2026-09-30-introduction-meeting-candidate",

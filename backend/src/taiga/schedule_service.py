@@ -29,6 +29,15 @@ from taiga.schedule_domain import (
 )
 
 PISCINE_START = date(2027, 3, 1)
+IMPORTANT_SCHEDULE_KEYS = frozenset(
+    {
+        "taiga-2026-09-05-open-school",
+        "taiga-2026-09-07-42-web-test",
+        "taiga-2026-10-03-fe-exam",
+        "taiga-2027-01-11-tokyo-commute-check",
+        "taiga-2027-03-01-piscine",
+    }
+)
 SCHEDULE_ITEM_TYPES = {
     "assignment",
     "exam",
@@ -42,6 +51,12 @@ SCHEDULE_ITEM_TYPES = {
     "rest",
     "review",
 }
+
+
+def _is_important_schedule_item(item: ScheduleItemResponse) -> bool:
+    return item.scheduleKey in IMPORTANT_SCHEDULE_KEYS or (
+        item.milestoneKey in IMPORTANT_SCHEDULE_KEYS if item.milestoneKey else False
+    )
 
 
 def _learner_id_for_schedule(session: Session, principal: Principal) -> Any:
@@ -221,10 +236,7 @@ def get_schedule_summary(
         (
             item
             for item in all_items
-            if item.isRequired
-            and item.itemType
-            in {"exam", "application", "orientation", "housing", "finance", "travel", "piscine"}
-            and item.displayStatus != "cancelled"
+            if item.isRequired and _is_important_schedule_item(item) and item.displayStatus != "cancelled"
         ),
         None,
     )

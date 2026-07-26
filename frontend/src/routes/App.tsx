@@ -74,7 +74,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { path: "/dashboard", label: "ダッシュボード", roles: ["learner", "reviewer", "admin"], icon: LayoutDashboard },
   { path: "/schedule", label: "スケジュール", roles: ["learner", "admin"], icon: CalendarDays },
-  { path: "/assignments", label: "課題", roles: ["learner", "admin"], icon: BookOpen },
+  { path: "/assignments", label: "教材", roles: ["learner", "admin"], icon: BookOpen },
   { path: "/reviews", label: "レビュー", roles: ["reviewer", "admin"], icon: CheckSquare },
   { path: "/runner", label: "実行環境", roles: ["learner", "admin"], icon: PlayCircle },
   { path: "/exams", label: "試験", roles: ["learner", "admin"], icon: GraduationCap },
@@ -123,8 +123,8 @@ export function App() {
     emptyScheduleForm(todayIsoDate()),
   );
   const [assignmentForm, setAssignmentForm] = useState({
-    repositoryUrl: "",
-    commitHash: "",
+    title: "",
+    learnedOn: todayIsoDate(),
     note: "",
     attachments: [] as File[],
   });
@@ -243,7 +243,7 @@ export function App() {
       submitAssignmentEvidence(assignmentId, assignmentForm),
     onSuccess: async (submission) => {
       setLastSubmissionId(submission.id);
-      setAssignmentForm({ repositoryUrl: "", commitHash: "", note: "", attachments: [] });
+      setAssignmentForm({ title: "", learnedOn: todayIsoDate(), note: "", attachments: [] });
       await queryClient.invalidateQueries({ queryKey: ["assignments", localUser] });
       await queryClient.invalidateQueries({ queryKey: ["assignment-detail", localUser] });
       await queryClient.invalidateQueries({ queryKey: ["dashboard", localUser] });
@@ -339,11 +339,6 @@ export function App() {
     login.mutate({ email: loginEmail.trim(), password: loginPassword });
   }
 
-  function openAssignment(assignmentId: string) {
-    setSelectedAssignmentId(assignmentId);
-    navigate(`/assignments/${assignmentId}`);
-  }
-
   function openScheduleAssignment(item: ScheduleItem) {
     if (!item.assignmentId) {
       return;
@@ -382,9 +377,9 @@ export function App() {
     event.preventDefault();
     if (
       !selectedAssignment ||
-      (!assignmentForm.note.trim() &&
-        !assignmentForm.repositoryUrl.trim() &&
-        assignmentForm.attachments.length === 0)
+      !assignmentForm.title.trim() ||
+      !assignmentForm.learnedOn ||
+      (!assignmentForm.note.trim() && assignmentForm.attachments.length === 0)
     ) {
       return;
     }
@@ -641,7 +636,7 @@ export function App() {
               <PageHeader
                 eyebrow="MISSION CONTROL"
                 title="ダッシュボード"
-                description="学習の現在地、次に進む課題、運用状態を確認できます。"
+                description="学習の現在地、次に進む教材、運用状態を確認できます。"
                 titleId="dashboard-title"
               />
               {dashboard.isLoading || progress.isLoading || scheduleSummary.isLoading ? <LoadingState /> : null}
@@ -650,12 +645,12 @@ export function App() {
                 daysUntilPiscine={daysUntilPiscine}
                 overdueCount={scheduleSummary.data?.learnerOverdueCount ?? 0}
                 reviewWaitingCount={scheduleSummary.data?.reviewWaitingCount ?? 0}
-                nextAction={firstAssignment?.title ?? "次の課題を確認"}
+                nextAction={firstAssignment?.title ?? "次の教材を確認"}
               />
               <section className="nova-card task-card" aria-labelledby="today-task-title">
                 <div className="section-heading">
                   <p className="eyebrow">TODAY</p>
-                  <h2 id="today-task-title">今日の課題</h2>
+                  <h2 id="today-task-title">今日の学習</h2>
                 </div>
                 {(dashboard.data?.today ?? []).length > 0 ? (
                   (dashboard.data?.today ?? []).slice(0, 3).map((assignment) => (
@@ -669,7 +664,7 @@ export function App() {
                   ))
                 ) : (
                   <EmptyState
-                    title="今日の課題はありません。"
+                    title="今日の学習予定はありません。"
                     action={<Link className="button-link" to="/assignments">一覧を確認</Link>}
                   />
                 )}
@@ -679,7 +674,6 @@ export function App() {
                 <Metric label="基本情報まで" value={`${daysUntilFeExam}日`} />
                 <Metric label="Piscineまで" value={`${daysUntilPiscine}日`} />
               </div>
-              <Alert tone="info">TAIGA NOVAは直接URL、ブラウザ更新、戻る操作に対応しています。</Alert>
             </section>
           ) : null}
 
@@ -782,54 +776,28 @@ export function App() {
           {activeRoute === "/assignments" ? (
             <section className="page-stack" aria-labelledby="assignments-title">
               <PageHeader
-                eyebrow="MISSION TASKS"
-                title="課題"
-                description="提出する課題を選び、内容・提出物・履歴を確認できます。"
+                eyebrow="LEARNING LOG"
+                title="学習記録"
+                description="タイトルと日付を入れて、既存教材で取り組んだ内容を提出できます。"
                 titleId="assignments-title"
               />
-              {assignments.isLoading ? <LoadingState label="課題を読み込み中です" /> : null}
-              {(assignments.data?.items ?? []).length > 0 ? (
-                <label className="assignment-selector">
-                  提出する課題
-                  <select
-                    value={selectedAssignment ?? ""}
-                    onChange={(event) => openAssignment(event.target.value)}
-                  >
-                    {(assignments.data?.items ?? []).map((assignment) => (
-                      <option key={assignment.id} value={assignment.id}>
-                        {assignment.title} / {assignment.stableCode}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
+              {assignments.isLoading ? <LoadingState label="教材を読み込み中です" /> : null}
               {assignments.data?.items.length === 0 ? (
-                <EmptyState title="表示できる課題はありません。" />
+                <EmptyState title="表示できる教材はありません。" />
               ) : null}
-              <div className="detail-box" aria-label="課題詳細">
+              <div className="detail-box" aria-label="教材詳細">
                 <div className="assignment-detail-header">
                   <div>
-                    <strong>{assignmentDetail.data?.assignment.title ?? "課題を選択してください"}</strong>
+                    <strong>{assignmentDetail.data?.assignment.title ?? "教材を選択してください"}</strong>
                     {assignmentDetail.data?.goal ? <p>{assignmentDetail.data.goal}</p> : null}
                   </div>
                   <StatusBadge status={assignmentDetail.data?.assignment.status} />
                 </div>
                 {assignmentDetail.isError ? (
-                  <Alert tone="danger">課題を読み込めません。権限またはURLを確認してください。</Alert>
+                  <Alert tone="danger">教材を読み込めません。権限またはURLを確認してください。</Alert>
                 ) : null}
                 {assignmentDetail.data ? (
                   <div className="assignment-detail-grid">
-                    <Alert tone="info">
-                      課題内容は公開教材とカリキュラム定義に基づきます。外部根拠がある予定はスケジュール詳細の根拠URLに表示します。
-                    </Alert>
-                    <section className="assignment-panel" aria-labelledby="assignment-steps-title">
-                      <h2 id="assignment-steps-title">やること</h2>
-                      <ol className="plain-list">
-                        {assignmentDetail.data.instructions.map((item) => (
-                          <li key={item}>{item}</li>
-                        ))}
-                      </ol>
-                    </section>
                     <section className="assignment-panel" aria-labelledby="assignment-materials-title">
                       <h2 id="assignment-materials-title">教材</h2>
                       <div className="material-list">
@@ -852,33 +820,13 @@ export function App() {
                         ))}
                       </div>
                     </section>
-                    <section className="assignment-panel" aria-labelledby="assignment-submit-title">
-                      <h2 id="assignment-submit-title">提出方法</h2>
+                    <section className="assignment-panel" aria-labelledby="assignment-steps-title">
+                      <h2 id="assignment-steps-title">進め方</h2>
                       <ol className="plain-list">
-                        {assignmentDetail.data.submissionGuide.map((item) => (
+                        {assignmentDetail.data.instructions.map((item) => (
                           <li key={item}>{item}</li>
                         ))}
                       </ol>
-                      <div className="artifact-list" aria-label="提出物">
-                        <strong>提出物</strong>
-                        {assignmentDetail.data.requiredArtifacts.length > 0 ? (
-                          assignmentDetail.data.requiredArtifacts.map((artifact) => (
-                            <span key={`${artifact.path}-${artifact.kind}`}>
-                              {artifact.path} ({artifact.kind})
-                            </span>
-                          ))
-                        ) : (
-                          <span>回答メモまたはGitHub URL</span>
-                        )}
-                      </div>
-                    </section>
-                    <section className="assignment-panel" aria-labelledby="assignment-review-title">
-                      <h2 id="assignment-review-title">合格条件</h2>
-                      <ul className="plain-list">
-                        {assignmentDetail.data.approvalCriteria.map((item) => (
-                          <li key={item}>{item}</li>
-                        ))}
-                      </ul>
                     </section>
                     <section className="assignment-panel assignment-history-panel" aria-labelledby="assignment-history-title">
                       <h2 id="assignment-history-title">提出履歴</h2>
@@ -936,42 +884,43 @@ export function App() {
               {canSubmitAssignment && assignmentDetail.data ? (
                 <form className="submission-form" onSubmit={submitAssignmentForm}>
                   <div className="section-heading">
-                    <p className="eyebrow">SUBMIT</p>
-                    <h2>回答を提出</h2>
+                    <p className="eyebrow">LOG</p>
+                    <h2>学習記録を提出</h2>
                   </div>
                   <label>
-                    GitHub URL（任意）
+                    タイトル
                     <input
-                      type="url"
-                      value={assignmentForm.repositoryUrl}
-                      placeholder="https://github.com/..."
+                      required
+                      value={assignmentForm.title}
+                      placeholder="例: e-typing 腕試しを3回やった"
                       onChange={(event) =>
                         setAssignmentForm((current) => ({
                           ...current,
-                          repositoryUrl: event.target.value,
+                          title: event.target.value,
                         }))
                       }
                     />
                   </label>
                   <label>
-                    Commit hash（任意）
+                    日付
                     <input
-                      value={assignmentForm.commitHash}
-                      placeholder="abc123..."
+                      required
+                      type="date"
+                      value={assignmentForm.learnedOn}
                       onChange={(event) =>
                         setAssignmentForm((current) => ({
                           ...current,
-                          commitHash: event.target.value,
+                          learnedOn: event.target.value,
                         }))
                       }
                     />
                   </label>
                   <label>
-                    回答メモ
+                    学習メモ
                     <textarea
-                      required={!assignmentForm.repositoryUrl.trim()}
+                      required={assignmentForm.attachments.length === 0}
                       value={assignmentForm.note}
-                      placeholder="やったこと、結果、詰まった点、スクリーンショットの場所などを書く"
+                      placeholder="使った教材、やった範囲、できたこと、詰まったところを書く"
                       onChange={(event) =>
                         setAssignmentForm((current) => ({
                           ...current,
@@ -1009,9 +958,9 @@ export function App() {
                       className="primary-action"
                       disabled={
                         submitEvidence.isPending ||
-                        (!assignmentForm.note.trim() &&
-                          !assignmentForm.repositoryUrl.trim() &&
-                          assignmentForm.attachments.length === 0)
+                        !assignmentForm.title.trim() ||
+                        !assignmentForm.learnedOn ||
+                        (!assignmentForm.note.trim() && assignmentForm.attachments.length === 0)
                       }
                     >
                       提出する
@@ -1022,7 +971,7 @@ export function App() {
                       ? `提出しました。レビュー待ちです: ${shortId(lastSubmissionId)}`
                       : submitEvidence.error
                         ? "提出に失敗しました。入力内容を確認してください。"
-                        : "回答メモ、GitHub URL、写真添付のどれかを入れて提出できます。"}
+                        : "タイトル、日付、学習メモまたは写真添付を入れて提出できます。"}
                   </p>
                 </form>
               ) : null}
@@ -1485,7 +1434,7 @@ function ScheduleDayDetail({
               <div className="button-row">
                 {item.assignmentId ? (
                   <button type="button" onClick={() => onOpenAssignment(item)}>
-                    課題詳細へ
+                    記録へ
                   </button>
                 ) : null}
                 {item.sourceUrl ? (
@@ -1694,13 +1643,18 @@ function formatBytes(size: number) {
   return `${(size / (1024 * 1024)).toFixed(1)}MB`;
 }
 
+const importantScheduleKeys = new Set([
+  "taiga-2026-09-05-open-school",
+  "taiga-2026-09-07-42-web-test",
+  "taiga-2026-10-03-fe-exam",
+  "taiga-2027-01-11-tokyo-commute-check",
+  "taiga-2027-03-01-piscine",
+]);
+
 function isImportantScheduleItem(item: ScheduleItem) {
   return (
-    item.priority >= 80 ||
-    item.itemType === "milestone" ||
-    item.itemType === "exam" ||
-    item.itemType === "piscine" ||
-    Boolean(item.milestoneKey)
+    importantScheduleKeys.has(item.scheduleKey) ||
+    (item.milestoneKey ? importantScheduleKeys.has(item.milestoneKey) : false)
   );
 }
 

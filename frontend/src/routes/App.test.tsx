@@ -150,7 +150,7 @@ function installFetch(
                 date: "2026-07-27",
                 startAt: null,
                 endAt: null,
-                title: "基本情報：現在地確認",
+                title: "基本情報：既習範囲の確認",
                 description: "現在地確認を提出する。",
                 itemType: "milestone",
                 assignmentId,
@@ -197,7 +197,7 @@ function installFetch(
             date: "2026-07-27",
             startAt: null,
             endAt: null,
-            title: "基本情報：現在地確認",
+            title: "基本情報：既習範囲の確認",
             description: "現在地確認を提出する。",
             itemType: "milestone",
             assignmentId,
@@ -245,7 +245,7 @@ function installFetch(
           },
         ],
         requiredArtifacts: [{ path: "answer.md", kind: "file" }],
-        submissionGuide: ["教材を開く。", "回答メモを書いて提出する。"],
+        submissionGuide: ["教材を開く。", "学習メモを書いて提出する。"],
         submissionSpec: {},
         submissions: [
           {
@@ -436,7 +436,7 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "ローカルログイン" })).toBeInTheDocument();
     expect(screen.getAllByText("TAIGA NOVA").length).toBeGreaterThan(0);
     expect(await screen.findByRole("heading", { name: "基本情報試験まで" })).toBeInTheDocument();
-    expect(screen.getAllByText("69日").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("68日").length).toBeGreaterThan(0);
     expect(await screen.findByText("正常")).toBeInTheDocument();
     expect(await screen.findByText("上山 虎雅 · 学習者")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "実行環境" }));
@@ -452,7 +452,7 @@ describe("App", () => {
     renderApp();
 
     await screen.findByText("上山 虎雅 · 学習者");
-    fireEvent.click(screen.getByRole("link", { name: "課題" }));
+    fireEvent.click(screen.getByRole("link", { name: "教材" }));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "デモ回答を提出" })).toBeEnabled(),
     );
@@ -472,7 +472,7 @@ describe("App", () => {
     renderApp(["/assignments"]);
 
     expect(await screen.findByText("Typing basics")).toBeInTheDocument();
-    expect(screen.getByLabelText("提出する課題")).toHaveValue(assignmentId);
+    expect(screen.getByRole("heading", { name: "学習記録" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "デモ回答を提出" })).not.toBeInTheDocument();
     expect(screen.queryByText("新しい提出はまだありません。")).not.toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "提出履歴" })).toBeInTheDocument();
@@ -487,7 +487,13 @@ describe("App", () => {
     renderApp(["/assignments"]);
 
     expect(await screen.findByText("e-typing")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("回答メモ"), {
+    fireEvent.change(screen.getByLabelText("タイトル"), {
+      target: { value: "e-typing 腕試し" },
+    });
+    fireEvent.change(screen.getByLabelText("日付"), {
+      target: { value: "2026-07-26" },
+    });
+    fireEvent.change(screen.getByLabelText("学習メモ"), {
       target: { value: "タイピング練習を完了しました。" },
     });
     expect(screen.getByLabelText("写真ライブラリ・ファイル添付（任意）")).not.toHaveAttribute("capture");
@@ -537,8 +543,8 @@ describe("App", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "ナビゲーションを開く" }));
-    fireEvent.click(screen.getByRole("link", { name: "課題" }));
-    expect(await screen.findByLabelText("課題詳細")).toHaveTextContent("Typing basics");
+    fireEvent.click(screen.getByRole("link", { name: "教材" }));
+    expect(await screen.findByLabelText("教材詳細")).toHaveTextContent("Typing basics");
   });
 
   it("shows the schedule calendar and opens linked assignments", async () => {
@@ -546,12 +552,12 @@ describe("App", () => {
     renderApp(["/schedule"]);
 
     expect(await screen.findByRole("heading", { name: "スケジュール" })).toBeInTheDocument();
-    expect(await screen.findAllByText("基本情報：現在地確認")).not.toHaveLength(0);
+    expect(await screen.findAllByText("基本情報：既習範囲の確認")).not.toHaveLength(0);
     expect(screen.getByLabelText("カレンダー凡例")).toHaveTextContent("重要日");
     expect(await screen.findAllByText("遅延")).not.toHaveLength(0);
     expect(screen.getByText("根拠URL未設定")).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole("button", { name: "課題詳細へ" }));
-    expect(await screen.findByRole("heading", { name: "課題" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "記録へ" }));
+    expect(await screen.findByRole("heading", { name: "学習記録" })).toBeInTheDocument();
   });
 
   it("renders deadline and operating metrics without the old progress image", async () => {

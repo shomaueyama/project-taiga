@@ -592,18 +592,17 @@ async function uploadEvidenceFile(file: File): Promise<string> {
 
 export async function submitAssignmentEvidence(
   assignmentId: string,
-  input: { repositoryUrl: string; commitHash: string; note: string; attachments: File[] },
+  input: { title: string; learnedOn: string; note: string; attachments: File[] },
 ): Promise<Submission> {
-  const repositoryUrl = input.repositoryUrl.trim() || null;
-  const commitHash = input.commitHash.trim() || null;
+  const title = input.title.trim();
+  const learnedOn = input.learnedOn.trim();
   const note = input.note.trim();
   const body = [
-    "# TAIGA NOVA 提出メモ",
+    `# ${title}`,
+    "",
+    `日付: ${learnedOn}`,
     "",
     note || "提出メモは未入力です。",
-    "",
-    repositoryUrl ? `GitHub URL: ${repositoryUrl}` : null,
-    commitHash ? `Commit: ${commitHash}` : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -625,9 +624,9 @@ export async function submitAssignmentEvidence(
   return apiPost(
     `/assignments/${assignmentId}/submissions`,
     {
-      sourceType: repositoryUrl ? "public_git" : "file_upload",
-      repositoryUrl,
-      commitHash,
+      sourceType: "file_upload",
+      repositoryUrl: null,
+      commitHash: null,
       submissionNote: body,
       uploadIds: [upload.id, ...attachmentIds],
     },
