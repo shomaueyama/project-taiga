@@ -124,6 +124,7 @@ export function App() {
     repositoryUrl: "",
     commitHash: "",
     note: "",
+    attachments: [] as File[],
   });
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -233,7 +234,7 @@ export function App() {
       submitAssignmentEvidence(assignmentId, assignmentForm),
     onSuccess: async (submission) => {
       setLastSubmissionId(submission.id);
-      setAssignmentForm({ repositoryUrl: "", commitHash: "", note: "" });
+      setAssignmentForm({ repositoryUrl: "", commitHash: "", note: "", attachments: [] });
       await queryClient.invalidateQueries({ queryKey: ["assignments", localUser] });
       await queryClient.invalidateQueries({ queryKey: ["assignment-detail", localUser] });
       await queryClient.invalidateQueries({ queryKey: ["dashboard", localUser] });
@@ -355,7 +356,12 @@ export function App() {
 
   function submitAssignmentForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedAssignment || (!assignmentForm.note.trim() && !assignmentForm.repositoryUrl.trim())) {
+    if (
+      !selectedAssignment ||
+      (!assignmentForm.note.trim() &&
+        !assignmentForm.repositoryUrl.trim() &&
+        assignmentForm.attachments.length === 0)
+    ) {
       return;
     }
     submitEvidence.mutate({ assignmentId: selectedAssignment });
@@ -902,13 +908,39 @@ export function App() {
                       }
                     />
                   </label>
+                  <label>
+                    写真・ファイル添付（任意）
+                    <input
+                      type="file"
+                      accept="image/*,.md,.txt,.zip"
+                      capture="environment"
+                      multiple
+                      onChange={(event) =>
+                        setAssignmentForm((current) => ({
+                          ...current,
+                          attachments: Array.from(event.target.files ?? []),
+                        }))
+                      }
+                    />
+                  </label>
+                  {assignmentForm.attachments.length > 0 ? (
+                    <div className="attachment-list" aria-label="選択中の添付">
+                      {assignmentForm.attachments.map((file) => (
+                        <span key={`${file.name}-${file.size}`}>
+                          {file.name} · {formatBytes(file.size)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="button-row">
                     <button
                       type="submit"
                       className="primary-action"
                       disabled={
                         submitEvidence.isPending ||
-                        (!assignmentForm.note.trim() && !assignmentForm.repositoryUrl.trim())
+                        (!assignmentForm.note.trim() &&
+                          !assignmentForm.repositoryUrl.trim() &&
+                          assignmentForm.attachments.length === 0)
                       }
                     >
                       提出する
@@ -919,7 +951,7 @@ export function App() {
                       ? `提出しました。レビュー待ちです: ${shortId(lastSubmissionId)}`
                       : submitEvidence.error
                         ? "提出に失敗しました。入力内容を確認してください。"
-                        : "回答メモかGitHub URLのどちらかを入れて提出できます。"}
+                        : "回答メモ、GitHub URL、写真添付のどれかを入れて提出できます。"}
                   </p>
                 </form>
               ) : null}
@@ -971,6 +1003,9 @@ export function App() {
                     ) : null}
                     {submission.submissionNote ? (
                       <p className="submission-note-preview">{submission.submissionNote}</p>
+                    ) : null}
+                    {(submission.artifactNames ?? []).length > 0 ? (
+                      <p>添付: {(submission.artifactNames ?? []).join("、")}</p>
                     ) : null}
                   </div>
                   <div className="button-row">
@@ -1528,6 +1563,13 @@ function ScheduleAdminPanel({
 
 function arrayMetadata(value: unknown) {
   return Array.isArray(value) ? value.map(String) : [];
+}
+
+function formatBytes(size: number) {
+  if (size < 1024 * 1024) {
+    return `${Math.max(1, Math.round(size / 1024))}KB`;
+  }
+  return `${(size / (1024 * 1024)).toFixed(1)}MB`;
 }
 
 function isImportantScheduleItem(item: ScheduleItem) {

@@ -1,8 +1,21 @@
 from collections.abc import Awaitable, Callable
 from datetime import date
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Path, Query, Request, Response, status
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Header,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -103,6 +116,7 @@ from taiga.submission_service import (
     get_submission_detail,
     get_upload,
     review_queue,
+    upload_content,
 )
 
 app = FastAPI(title="Project Taiga Local MVP", version="0.1.0")
@@ -346,6 +360,25 @@ def upload_complete(
 ) -> UploadSessionResponse:
     try:
         return complete_upload(session, principal, upload_id, request)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Upload not found") from exc
+
+
+@app.put(
+    "/api/v1/uploads/{uploadId}/content",
+    response_model=UploadSessionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["submissions"],
+)
+async def upload_file_content(
+    file: Annotated[UploadFile, File()],
+    upload_id: UUID = upload_id_path,
+    _idempotency_key: str = Header(min_length=8, max_length=128, alias="Idempotency-Key"),
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> UploadSessionResponse:
+    try:
+        return upload_content(session, principal, upload_id, await file.read())
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Upload not found") from exc
 

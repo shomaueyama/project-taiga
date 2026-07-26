@@ -69,7 +69,11 @@ function installFetch(
     const url = new URL(String(input));
     const path = url.pathname;
     const method = init?.method ?? "GET";
-    const body = init?.body ? JSON.parse(String(init.body)) : null;
+    const contentType = new Headers(init?.headers).get("Content-Type") ?? "";
+    const body =
+      init?.body && contentType.includes("application/json")
+        ? JSON.parse(String(init.body))
+        : null;
     calls.push({ path, method, body });
 
     if (path === "/api/health") {
@@ -257,6 +261,9 @@ function installFetch(
     }
     if (path === "/api/v1/uploads/presign") {
       return response({ id: reviewId, status: "created", uploadUrl: "file://upload", expiresAt: now }, 201);
+    }
+    if (path === `/api/v1/uploads/${reviewId}/content`) {
+      return response({ id: reviewId, status: "accepted", expiresAt: now }, 202);
     }
     if (path === `/api/v1/uploads/${reviewId}/complete`) {
       return response({ id: reviewId, status: "accepted", expiresAt: now }, 202);

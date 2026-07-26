@@ -74,6 +74,7 @@ class SubmissionResponse(BaseModel):
     repositoryUrl: str | None = None
     commitHash: str | None = None
     submissionNote: str | None = None
+    artifactNames: list[str] = Field(default_factory=list)
 
 
 class AssignmentMaterial(BaseModel):

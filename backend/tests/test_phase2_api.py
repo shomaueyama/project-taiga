@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, cast
@@ -148,6 +149,29 @@ def test_assignment_dashboard_detail_progress_and_ownership(
     assert reviewer_detail.status_code == 404
     missing = client.get(f"/api/v1/assignments/{uuid4()}", headers=headers())
     assert missing.status_code == 404
+
+
+def test_upload_content_accepts_real_file(seeded: None, client: TestClient) -> None:
+    content = b"hello from mobile camera evidence"
+    upload = client.post(
+        "/api/v1/uploads/presign",
+        json={
+            "originalName": "evidence.jpg",
+            "mediaType": "image/jpeg",
+            "sizeBytes": len(content),
+            "sha256": hashlib.sha256(content).hexdigest(),
+        },
+        headers=headers(),
+    )
+    assert upload.status_code == 201
+    upload_id = upload.json()["id"]
+    completed = client.put(
+        f"/api/v1/uploads/{upload_id}/content",
+        files={"file": ("evidence.jpg", content, "image/jpeg")},
+        headers=headers(),
+    )
+    assert completed.status_code == 202
+    assert completed.json()["status"] == "accepted"
 
 
 @pytest.mark.parametrize(

@@ -168,6 +168,7 @@ const submissionSchema = z.object({
   repositoryUrl: z.string().nullable().optional(),
   commitHash: z.string().nullable().optional(),
   submissionNote: z.string().nullable().optional(),
+  artifactNames: z.array(z.string()).optional(),
 });
 
 const reviewQueueSchema = z.object({
@@ -355,6 +356,22 @@ async function apiPost<T>(path: string, body: unknown, schema: z.ZodType<T>): Pr
   return schema.parse(await response.json());
 }
 
+async function apiPutForm<T>(path: string, body: FormData, schema: z.ZodType<T>): Promise<T> {
+  const response = await fetchWithTimeout(`${apiBaseUrl}/api/v1${path}`, {
+    method: "PUT",
+    credentials: "include",
+    headers: {
+      ...authHeaders(),
+      "Idempotency-Key": crypto.randomUUID(),
+    },
+    body,
+  });
+  if (!response.ok) {
+    throw new ApiError(`API request failed: ${response.status}`, response.status);
+  }
+  return schema.parse(await response.json());
+}
+
 async function apiPostWithoutIdempotency<T>(
   path: string,
   body: unknown,
@@ -517,9 +534,35 @@ async function sha256Hex(value: string): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+async function sha256File(file: File): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function uploadEvidenceFile(file: File): Promise<string> {
+  const sha256 = await sha256File(file);
+  const upload = await apiPost(
+    "/uploads/presign",
+    {
+      originalName: file.name,
+      mediaType: file.type || "application/octet-stream",
+      sizeBytes: file.size,
+      sha256,
+    },
+    uploadSessionSchema,
+  );
+  const form = new FormData();
+  form.append("file", file, file.name);
+  const completed = await apiPutForm(`/uploads/${upload.id}/content`, form, uploadSessionSchema);
+  if (completed.status !== "accepted") {
+    throw new ApiError("Upload rejected", 409);
+  }
+  return upload.id;
+}
+
 export async function submitAssignmentEvidence(
   assignmentId: string,
-  input: { repositoryUrl: string; commitHash: string; note: string },
+  input: { repositoryUrl: string; commitHash: string; note: string; attachments: File[] },
 ): Promise<Submission> {
   const repositoryUrl = input.repositoryUrl.trim() || null;
   const commitHash = input.commitHash.trim() || null;
@@ -535,13 +578,20 @@ export async function submitAssignmentEvidence(
     .filter(Boolean)
     .join("\n");
   const sha256 = await sha256Hex(body);
-  const sizeBytes = new TextEncoder().encode(body).byteLength;
+  const noteFile = new File([body], "answer.md", { type: "text/markdown" });
+  const sizeBytes = noteFile.size;
   const upload = await apiPost(
     "/uploads/presign",
     { originalName: "answer.md", mediaType: "text/markdown", sizeBytes, sha256 },
     uploadSessionSchema,
   );
-  await apiPost(`/uploads/${upload.id}/complete`, { sizeBytes, sha256 }, uploadSessionSchema);
+  const noteForm = new FormData();
+  noteForm.append("file", noteFile, "answer.md");
+  await apiPutForm(`/uploads/${upload.id}/content`, noteForm, uploadSessionSchema);
+  const attachmentIds = [];
+  for (const file of input.attachments) {
+    attachmentIds.push(await uploadEvidenceFile(file));
+  }
   return apiPost(
     `/assignments/${assignmentId}/submissions`,
     {
@@ -549,7 +599,7 @@ export async function submitAssignmentEvidence(
       repositoryUrl,
       commitHash,
       submissionNote: body,
-      uploadIds: [upload.id],
+      uploadIds: [upload.id, ...attachmentIds],
     },
     submissionSchema,
   );

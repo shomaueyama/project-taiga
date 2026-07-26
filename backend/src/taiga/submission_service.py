@@ -30,7 +30,20 @@ from taiga.state_transitions import (
     submission_status_after_creation,
 )
 
-ALLOWED_EXTENSIONS = {".c", ".h", ".md", ".txt", ".json", ".sh", ".png", ".jpg", ".jpeg", ".zip"}
+ALLOWED_EXTENSIONS = {
+    ".c",
+    ".h",
+    ".md",
+    ".txt",
+    ".json",
+    ".sh",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".heic",
+    ".heif",
+    ".zip",
+}
 ALLOWED_MEDIA_TYPES = {
     ".c": {"text/plain", "text/x-c"},
     ".h": {"text/plain", "text/x-c"},
@@ -41,6 +54,8 @@ ALLOWED_MEDIA_TYPES = {
     ".png": {"image/png"},
     ".jpg": {"image/jpeg"},
     ".jpeg": {"image/jpeg"},
+    ".heic": {"image/heic", "image/heif", "application/octet-stream"},
+    ".heif": {"image/heic", "image/heif", "application/octet-stream"},
     ".zip": {"application/zip", "application/x-zip-compressed"},
 }
 MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
@@ -60,6 +75,7 @@ def _submission(row: Any) -> SubmissionResponse:
         repositoryUrl=row.get("repository_url"),
         commitHash=row.get("commit_hash"),
         submissionNote=(row.get("artifact_manifest_json") or {}).get("submissionNote"),
+        artifactNames=[str(item) for item in row.get("artifact_names", [])],
     )
 
 
@@ -230,6 +246,56 @@ def complete_upload(
     return get_upload(session, principal, upload_id)
 
 
+def upload_content(
+    session: Session,
+    principal: Principal,
+    upload_id: uuid.UUID,
+    content: bytes,
+) -> UploadSessionResponse:
+    row = get_upload_row(session, principal, upload_id)
+    size_bytes = len(content)
+    sha256 = hashlib.sha256(content).hexdigest()
+    rejection_code = None
+    status = "accepted"
+    if row["scan_status"] == "rejected":
+        status = "rejected"
+        rejection_code = row["rejection_code"]
+    elif size_bytes > MAX_UPLOAD_SIZE_BYTES:
+        status = "rejected"
+        rejection_code = "size_limit_exceeded"
+    elif size_bytes != row["declared_size_bytes"] or sha256 != row["declared_sha256"]:
+        status = "rejected"
+        rejection_code = "metadata_mismatch"
+
+    if status == "accepted":
+        target = Path(get_settings().local_storage_root) / "uploads" / row["object_key"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+
+    session.execute(
+        text(
+            """
+            UPDATE upload_sessions
+            SET actual_size_bytes = :size_bytes,
+                actual_sha256 = :sha256,
+                scan_status = :status,
+                rejection_code = :rejection_code,
+                completed_at = now()
+            WHERE id = :id AND owner_id = :owner_id
+            """
+        ),
+        {
+            "id": upload_id,
+            "owner_id": principal.id,
+            "size_bytes": size_bytes,
+            "sha256": sha256,
+            "status": status,
+            "rejection_code": rejection_code,
+        },
+    )
+    return get_upload(session, principal, upload_id)
+
+
 def create_submission(
     session: Session,
     principal: Principal,
@@ -318,6 +384,13 @@ def create_submission(
         },
     )
     for upload in upload_rows:
+        accepted_key = upload["object_key"].replace("quarantine/", "accepted/", 1)
+        storage_root = Path(get_settings().local_storage_root) / "uploads"
+        quarantine_path = storage_root / upload["object_key"]
+        accepted_path = storage_root / accepted_key
+        if quarantine_path.exists():
+            accepted_path.parent.mkdir(parents=True, exist_ok=True)
+            quarantine_path.replace(accepted_path)
         session.execute(
             text(
                 """
@@ -335,7 +408,7 @@ def create_submission(
                 "id": uuid.uuid4(),
                 "submission_id": submission_id,
                 "upload_session_id": upload["id"],
-                "s3_key": upload["object_key"].replace("quarantine/", "accepted/", 1),
+                "s3_key": accepted_key,
                 "sha256": upload["actual_sha256"] or upload["declared_sha256"],
                 "media_type": upload["detected_media_type"] or upload["declared_media_type"],
                 "size_bytes": upload["actual_size_bytes"] or upload["declared_size_bytes"],
@@ -388,10 +461,18 @@ def get_submission_summary(
         session.execute(
             text(
                 """
-                SELECT id, assignment_id, submission_version, status::text, created_at,
-                       repository_url, commit_hash, artifact_manifest_json
-                FROM submissions
-                WHERE id = :id AND (:is_reviewer OR learner_id = :learner_id)
+                SELECT s.id, s.assignment_id, s.submission_version, s.status::text, s.created_at,
+                       s.repository_url, s.commit_hash, s.artifact_manifest_json,
+                       COALESCE(
+                           (
+                               SELECT array_agg(sa.original_name ORDER BY sa.original_name)
+                               FROM submission_artifacts sa
+                               WHERE sa.submission_id = s.id
+                           ),
+                           ARRAY[]::text[]
+                       ) AS artifact_names
+                FROM submissions s
+                WHERE s.id = :id AND (:is_reviewer OR s.learner_id = :learner_id)
                 """
             ),
             {
@@ -455,11 +536,19 @@ def review_queue(session: Session, principal: Principal, limit: int = 20) -> Rev
         session.execute(
             text(
                 """
-                SELECT id, assignment_id, submission_version, status::text, created_at,
-                       repository_url, commit_hash, artifact_manifest_json
-                FROM submissions
-                WHERE status = 'manual_review_pending'
-                ORDER BY created_at DESC
+                SELECT s.id, s.assignment_id, s.submission_version, s.status::text, s.created_at,
+                       s.repository_url, s.commit_hash, s.artifact_manifest_json,
+                       COALESCE(
+                           (
+                               SELECT array_agg(sa.original_name ORDER BY sa.original_name)
+                               FROM submission_artifacts sa
+                               WHERE sa.submission_id = s.id
+                           ),
+                           ARRAY[]::text[]
+                       ) AS artifact_names
+                FROM submissions s
+                WHERE s.status = 'manual_review_pending'
+                ORDER BY s.created_at DESC
                 LIMIT :limit
                 """
             ),
