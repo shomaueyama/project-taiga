@@ -5,7 +5,7 @@ import json
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -66,6 +66,7 @@ def _json(value: object) -> str:
 
 
 def _submission(row: Any) -> SubmissionResponse:
+    artifact_links = row.get("artifact_links", []) or []
     return SubmissionResponse(
         id=row["id"],
         assignmentId=row["assignment_id"],
@@ -76,6 +77,7 @@ def _submission(row: Any) -> SubmissionResponse:
         commitHash=row.get("commit_hash"),
         submissionNote=(row.get("artifact_manifest_json") or {}).get("submissionNote"),
         artifactNames=[str(item) for item in row.get("artifact_names", [])],
+        artifactLinks=list(artifact_links),
     )
 
 
@@ -476,7 +478,23 @@ def get_submission_summary(
                                WHERE sa.submission_id = s.id
                            ),
                            ARRAY[]::text[]
-                       ) AS artifact_names
+                       ) AS artifact_names,
+                       COALESCE(
+                           (
+                               SELECT jsonb_agg(
+                                   jsonb_build_object(
+                                       'id', sa.id,
+                                       'originalName', sa.original_name,
+                                       'mediaType', sa.media_type,
+                                       'sizeBytes', sa.size_bytes
+                                   )
+                                   ORDER BY sa.original_name
+                               )
+                               FROM submission_artifacts sa
+                               WHERE sa.submission_id = s.id
+                           ),
+                           '[]'::jsonb
+                       ) AS artifact_links
                 FROM submissions s
                 WHERE s.id = :id AND (:is_reviewer OR s.learner_id = :learner_id)
                 """
@@ -505,7 +523,7 @@ def get_submission_detail(
         session.execute(
             text(
                 """
-                SELECT original_name, media_type, size_bytes, sha256
+                SELECT id, original_name, media_type, size_bytes, sha256
                 FROM submission_artifacts
                 WHERE submission_id = :submission_id
                 ORDER BY original_name
@@ -536,6 +554,47 @@ def get_submission_detail(
     )
 
 
+class ArtifactContent(NamedTuple):
+    content: bytes
+    media_type: str
+    original_name: str
+
+
+def get_submission_artifact_content(
+    session: Session,
+    principal: Principal,
+    artifact_id: uuid.UUID,
+) -> ArtifactContent:
+    row = (
+        session.execute(
+            text(
+                """
+                SELECT sa.original_name, sa.media_type, us.uploaded_blob
+                FROM submission_artifacts sa
+                JOIN submissions s ON s.id = sa.submission_id
+                JOIN upload_sessions us ON us.id = sa.upload_session_id
+                WHERE sa.id = :artifact_id
+                  AND (:is_reviewer OR s.learner_id = :learner_id)
+                """
+            ),
+            {
+                "artifact_id": artifact_id,
+                "learner_id": principal.id,
+                "is_reviewer": is_reviewer(principal),
+            },
+        )
+        .mappings()
+        .first()
+    )
+    if row is None or row["uploaded_blob"] is None:
+        raise NotFoundError("Artifact not found", code="artifact_not_found")
+    return ArtifactContent(
+        content=bytes(row["uploaded_blob"]),
+        media_type=row["media_type"],
+        original_name=row["original_name"],
+    )
+
+
 def review_queue(session: Session, principal: Principal, limit: int = 20) -> ReviewQueuePage:
     require_reviewer(principal)
     rows = (
@@ -551,7 +610,23 @@ def review_queue(session: Session, principal: Principal, limit: int = 20) -> Rev
                                WHERE sa.submission_id = s.id
                            ),
                            ARRAY[]::text[]
-                       ) AS artifact_names
+                       ) AS artifact_names,
+                       COALESCE(
+                           (
+                               SELECT jsonb_agg(
+                                   jsonb_build_object(
+                                       'id', sa.id,
+                                       'originalName', sa.original_name,
+                                       'mediaType', sa.media_type,
+                                       'sizeBytes', sa.size_bytes
+                                   )
+                                   ORDER BY sa.original_name
+                               )
+                               FROM submission_artifacts sa
+                               WHERE sa.submission_id = s.id
+                           ),
+                           '[]'::jsonb
+                       ) AS artifact_links
                 FROM submissions s
                 WHERE s.status = 'manual_review_pending'
                 ORDER BY s.created_at DESC

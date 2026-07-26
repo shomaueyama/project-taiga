@@ -172,6 +172,27 @@ def test_upload_content_accepts_real_file(seeded: None, client: TestClient) -> N
     )
     assert completed.status_code == 202
     assert completed.json()["status"] == "accepted"
+    assignments = client.get("/api/v1/assignments?limit=1", headers=headers())
+    assignment_id = assignments.json()["items"][0]["id"]
+    submission = client.post(
+        f"/api/v1/assignments/{assignment_id}/submissions",
+        json={
+            "sourceType": "file_upload",
+            "repositoryUrl": None,
+            "commitHash": None,
+            "submissionNote": "camera evidence smoke",
+            "uploadIds": [upload_id],
+        },
+        headers=headers(),
+    )
+    assert submission.status_code == 201
+    artifact_link = submission.json()["artifactLinks"][0]
+    artifact = client.get(
+        f"/api/v1/submission-artifacts/{artifact_link['id']}/content",
+        headers=headers("admin@example.local"),
+    )
+    assert artifact.status_code == 200
+    assert artifact.content == content
 
 
 @pytest.mark.parametrize(

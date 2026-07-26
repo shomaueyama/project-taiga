@@ -738,7 +738,8 @@ h2 {
 
 .material-item div,
 .artifact-list,
-.attachment-list {
+.attachment-list,
+.attachment-link-list {
   min-width: 0;
   display: grid;
   gap: 2px;
@@ -778,6 +779,10 @@ h2 {
 .submission-form textarea {
   min-height: 132px;
   resize: vertical;
+}
+
+.attachment-link-list {
+  gap: var(--space-1);
 }
 
 .fatal-shell {

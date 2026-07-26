@@ -19,6 +19,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from starlette.responses import Response as StarletteResponse
 
 from taiga.admin_service import (
     analytics,
@@ -113,6 +114,7 @@ from taiga.submission_service import (
     create_review,
     create_submission,
     create_upload,
+    get_submission_artifact_content,
     get_submission_detail,
     get_upload,
     review_queue,
@@ -430,6 +432,23 @@ def submission_detail(
         return get_submission_detail(session, principal, submission_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Submission not found") from exc
+
+
+@app.get("/api/v1/submission-artifacts/{artifactId}/content", tags=["submissions"])
+def submission_artifact_content(
+    artifact_id: Annotated[UUID, Path(alias="artifactId")],
+    principal: Principal = principal_dependency,
+    session: Session = session_dependency,
+) -> StarletteResponse:
+    try:
+        artifact = get_submission_artifact_content(session, principal, artifact_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Artifact not found") from exc
+    return StarletteResponse(
+        artifact.content,
+        media_type=artifact.media_type,
+        headers={"Content-Disposition": f'inline; filename="{artifact.original_name}"'},
+    )
 
 
 @app.get("/api/v1/reviews/queue", response_model=ReviewQueuePage, tags=["reviews"])

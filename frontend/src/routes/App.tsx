@@ -1007,6 +1007,20 @@ export function App() {
                     {(submission.artifactNames ?? []).length > 0 ? (
                       <p>添付: {(submission.artifactNames ?? []).join("、")}</p>
                     ) : null}
+                    {(submission.artifactLinks ?? []).length > 0 ? (
+                      <div className="attachment-link-list" aria-label="提出添付">
+                        {(submission.artifactLinks ?? []).map((artifact) => (
+                          <a
+                            key={artifact.id}
+                            href={`/api/v1/submission-artifacts/${artifact.id}/content`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {artifact.originalName}
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="button-row">
                     <button

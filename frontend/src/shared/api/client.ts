@@ -169,6 +169,14 @@ const submissionSchema = z.object({
   commitHash: z.string().nullable().optional(),
   submissionNote: z.string().nullable().optional(),
   artifactNames: z.array(z.string()).optional(),
+  artifactLinks: z.array(
+    z.object({
+      id: z.string(),
+      originalName: z.string(),
+      mediaType: z.string(),
+      sizeBytes: z.number(),
+    }),
+  ).optional(),
 });
 
 const reviewQueueSchema = z.object({

@@ -65,6 +65,13 @@ class CreateSubmissionRequest(StrictRequest):
     uploadIds: list[UUID] = Field(max_length=10)
 
 
+class SubmissionArtifactLink(BaseModel):
+    id: UUID
+    originalName: str
+    mediaType: str
+    sizeBytes: int
+
+
 class SubmissionResponse(BaseModel):
     id: UUID
     assignmentId: UUID
@@ -75,6 +82,7 @@ class SubmissionResponse(BaseModel):
     commitHash: str | None = None
     submissionNote: str | None = None
     artifactNames: list[str] = Field(default_factory=list)
+    artifactLinks: list[SubmissionArtifactLink] = Field(default_factory=list)
 
 
 class AssignmentMaterial(BaseModel):
