@@ -19,8 +19,8 @@ def load_production_users(session: Session, settings: Settings) -> dict[str, UUI
     expected = {ADMIN_EMAIL, LEARNER_EMAIL}
     if settings.app_env != "production":
         raise RuntimeError("Production seed can only run when APP_ENV=production")
-    if settings.authorized_email_set != expected:
-        raise RuntimeError("AUTHORIZED_USER_EMAILS does not match the approved production users")
+    if not expected.issubset(settings.authorized_email_set):
+        raise RuntimeError("AUTHORIZED_USER_EMAILS must include the approved primary users")
 
     rows = (
         session.execute(

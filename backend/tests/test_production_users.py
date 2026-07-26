@@ -23,11 +23,14 @@ def production_settings() -> Settings:
         RUNNER_ENABLED=False,
         CLOUDFLARE_ACCESS_TEAM_DOMAIN="https://team.cloudflareaccess.com",
         CLOUDFLARE_ACCESS_AUD="aud",
-        AUTHORIZED_USER_EMAILS="shomabirdie@icloud.com,taiga-albatross@softbank.ne.jp",
+        AUTHORIZED_USER_EMAILS=(
+            "shomabirdie@icloud.com,taiga-albatross@softbank.ne.jp,"
+            "jiemashangshan@gmail.com"
+        ),
     )
 
 
-def launch_specs() -> tuple[ProductionUserSpec, ProductionUserSpec]:
+def launch_specs() -> tuple[ProductionUserSpec, ...]:
     return (
         ProductionUserSpec(
             email="shomabirdie@icloud.com",
@@ -38,6 +41,12 @@ def launch_specs() -> tuple[ProductionUserSpec, ProductionUserSpec]:
         ProductionUserSpec(
             email="taiga-albatross@softbank.ne.jp",
             display_name="Taiga",
+            role="learner",
+            timezone="Asia/Tokyo",
+        ),
+        ProductionUserSpec(
+            email="jiemashangshan@gmail.com",
+            display_name="Jiemashangshan",
             role="learner",
             timezone="Asia/Tokyo",
         ),
@@ -66,6 +75,12 @@ def test_load_specs_requires_owner_supplied_json(tmp_path: Path) -> None:
             "displayName": "Taiga",
             "role": "learner",
             "timezone": "Asia/Tokyo"
+          },
+          {
+            "email": "jiemashangshan@gmail.com",
+            "displayName": "Jiemashangshan",
+            "role": "learner",
+            "timezone": "Asia/Tokyo"
           }
         ]
         """,
@@ -75,7 +90,7 @@ def test_load_specs_requires_owner_supplied_json(tmp_path: Path) -> None:
     specs = load_specs(path)
 
     assert specs[0].email == "shomabirdie@icloud.com"
-    assert specs[1].role == "learner"
+    assert specs[2].role == "learner"
 
 
 def test_bootstrap_validates_exact_authorized_email_set() -> None:
@@ -102,7 +117,10 @@ def test_bootstrap_requires_production_environment_for_apply() -> None:
     local_settings = Settings(
         APP_ENV="local",
         LOCAL_AUTH_ENABLED=True,
-        AUTHORIZED_USER_EMAILS="shomabirdie@icloud.com,taiga-albatross@softbank.ne.jp",
+        AUTHORIZED_USER_EMAILS=(
+            "shomabirdie@icloud.com,taiga-albatross@softbank.ne.jp,"
+            "jiemashangshan@gmail.com"
+        ),
     )
 
     with pytest.raises(ValueError, match="APP_ENV=production"):
@@ -114,7 +132,7 @@ def test_bootstrap_requires_production_environment_for_apply() -> None:
         )
 
 
-def test_bootstrap_upserts_exact_two_active_users_idempotently() -> None:
+def test_bootstrap_upserts_active_users_idempotently() -> None:
     migrate()
     settings = production_settings()
     specs = launch_specs()
@@ -130,7 +148,8 @@ def test_bootstrap_upserts_exact_two_active_users_idempotently() -> None:
                 FROM users
                 WHERE cognito_sub IN (
                     'shomabirdie@icloud.com',
-                    'taiga-albatross@softbank.ne.jp'
+                    'taiga-albatross@softbank.ne.jp',
+                    'jiemashangshan@gmail.com'
                 )
                 ORDER BY cognito_sub
                 """
@@ -138,10 +157,13 @@ def test_bootstrap_upserts_exact_two_active_users_idempotently() -> None:
         ).mappings().all()
 
     assert [row["cognito_sub"] for row in rows] == [
+        "jiemashangshan@gmail.com",
         "shomabirdie@icloud.com",
         "taiga-albatross@softbank.ne.jp",
     ]
-    assert rows[0]["role"] == "admin"
+    assert rows[0]["role"] == "learner"
     assert rows[0]["status"] == "active"
-    assert rows[1]["role"] == "learner"
-    assert rows[1]["timezone"] == "Asia/Tokyo"
+    assert rows[1]["role"] == "admin"
+    assert rows[1]["status"] == "active"
+    assert rows[2]["role"] == "learner"
+    assert rows[2]["timezone"] == "Asia/Tokyo"
