@@ -2,140 +2,485 @@
   {
     "key": "taiga-2026-07-27-fe-baseline",
     "date": "2026-07-27",
-    "title": "基本情報：既習範囲の確認",
-    "description": "すでに進めている学習を前提に、ハードウェア範囲の残り、分からない用語、10月3日に向けた現在地を記録する。",
+    "title": "基本情報：ハードウェア現在地確認",
+    "description": "IPAシラバスの基礎理論・コンピュータ構成要素に合わせて、ハードウェア確認問題20問と用語説明で現在地を測る。",
     "itemType": "assignment",
     "priority": 10,
     "dueTime": "23:59",
-    "allowedEvidenceTypes": ["screenshot", "photo", "text"],
-    "deliverables": ["ハードウェア範囲の残り", "分からなかった用語一覧", "明日終わらせる範囲"],
-    "acceptanceCriteria": ["既習範囲が分かる", "分からない項目を隠していない", "Shomaが承認"]
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "photo",
+      "text"
+    ],
+    "deliverables": [
+      "ハードウェア確認問題20問の結果（問題数20問、正答数、正答率）",
+      "採点結果または回答画面のスクリーンショット1枚以上",
+      "間違えた問題番号、正しい答え、間違えた理由",
+      "CPU・メモリ・ストレージ・入出力装置・OSのうち分からない用語3個以上の説明",
+      "明日完了させる範囲と予定時間"
+    ],
+    "acceptanceCriteria": [
+      "20問解いた証跡がある",
+      "正答数と正答率が数字で書かれている",
+      "間違い直しが全問分ある",
+      "分からない用語を空欄にしていない",
+      "翌日の学習範囲が具体的に決まっている"
+    ],
+    "sourceUrl": "https://www.ipa.go.jp/shiken/syllabus/gaiyou.html"
   },
   {
     "key": "taiga-2026-07-28-computer-components",
     "date": "2026-07-28",
-    "title": "ハードウェア範囲を完了",
-    "description": "CPU、メモリ、ストレージ、入出力装置、OSとの関係を確認し、ハードウェア範囲を終える。",
+    "title": "基本情報：ハードウェア範囲完了判定",
+    "description": "コンピュータ構成要素を復習し、確認問題30問でハードウェア範囲を完了扱いにできるか判定する。",
     "itemType": "assignment",
     "priority": 10,
     "dueTime": "23:59",
-    "allowedEvidenceTypes": ["screenshot", "photo", "text"],
-    "deliverables": ["ハードウェア範囲の完了メモ", "分からなかった用語", "確認問題の結果"],
-    "acceptanceCriteria": ["主要部品の役割を説明できる", "分からない用語が回収されている", "Shomaが承認"]
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "photo",
+      "text"
+    ],
+    "deliverables": [
+      "ハードウェア確認問題30問の結果（問題数30問、正答数、正答率）",
+      "採点結果のスクリーンショット1枚以上",
+      "CPU・メモリ・ストレージ・入出力装置・OSを各1行で説明",
+      "間違えた全問題の原因と正しい答え",
+      "正答率70%未満の場合の再演習予定"
+    ],
+    "acceptanceCriteria": [
+      "30問解いた証跡がある",
+      "正答率70%以上、または間違い直しが全問分ある",
+      "主要部品5項目を本人の言葉で説明している",
+      "再演習が必要な場合は日付が決まっている"
+    ],
+    "sourceUrl": "https://www.ipa.go.jp/shiken/syllabus/gaiyou.html"
   },
   {
     "key": "taiga-2026-07-29-binary-decimal",
     "date": "2026-07-29",
-    "title": "2進数と10進数",
-    "description": "変換問題10問、計算過程、間違えた問題の再回答を提出する。",
+    "title": "基本情報：基数変換とビット演算",
+    "description": "IPAシラバスの基礎理論に合わせて、2進数・10進数・16進数・ビット演算を25問で確認する。",
     "itemType": "assignment",
     "priority": 10,
     "dueTime": "23:59",
-    "allowedEvidenceTypes": ["screenshot", "photo", "text"],
-    "deliverables": ["変換問題10問", "計算過程", "間違えた問題の再回答"],
-    "acceptanceCriteria": ["計算過程が確認できる", "再回答が正しい", "Shomaが承認"]
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "photo",
+      "text"
+    ],
+    "deliverables": [
+      "基数変換20問の結果（問題数20問、正答数、正答率）",
+      "ビット演算5問の結果（AND/OR/XOR/シフトを含む）",
+      "途中式が分かるメモまたは写真1枚以上",
+      "間違えた問題の再回答",
+      "まだ迷う変換パターン1個以上"
+    ],
+    "acceptanceCriteria": [
+      "合計25問解いたことが分かる",
+      "正答率80%以上、または間違い直しが全問ある",
+      "途中式を見て解き方を追える",
+      "同じ種類のミスが次に防げる形で書かれている"
+    ],
+    "sourceUrl": "https://www.ipa.go.jp/shiken/syllabus/gaiyou.html"
   },
   {
     "key": "taiga-2026-07-30-logic-operations",
     "date": "2026-07-30",
-    "title": "論理演算",
-    "description": "AND、OR、NOT、XORの真理値表、確認問題10問、日常的な例を提出する。",
+    "title": "基本情報：論理演算と真理値表",
+    "description": "AND、OR、NOT、XOR、ド・モルガンの法則を、真理値表と20問の確認問題で確認する。",
     "itemType": "assignment",
     "priority": 10,
     "dueTime": "23:59",
-    "allowedEvidenceTypes": ["screenshot", "photo", "text"],
-    "deliverables": ["真理値表", "確認問題10問", "各演算の日常例"],
-    "acceptanceCriteria": ["真理値表が正しい", "日常例を本人が説明できる", "Shomaが承認"]
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "photo",
+      "text"
+    ],
+    "deliverables": [
+      "AND/OR/NOT/XORの真理値表",
+      "ド・モルガンの法則の例題2問",
+      "確認問題20問の結果（問題数20問、正答数、正答率）",
+      "間違えた問題の原因と正しい答え",
+      "日常例またはプログラム例を1つ"
+    ],
+    "acceptanceCriteria": [
+      "真理値表の全パターンが埋まっている",
+      "20問解いたことが分かる",
+      "正答率80%以上、または間違い直しが全問ある",
+      "ド・モルガンの法則を自分の言葉で説明している"
+    ],
+    "sourceUrl": "https://www.ipa.go.jp/shiken/syllabus/gaiyou.html"
   },
   {
     "key": "taiga-2026-07-31-algorithm-structures",
     "date": "2026-07-31",
-    "title": "アルゴリズムの基本構造",
-    "description": "順次・分岐・反復の説明、手書きフローチャート2つ、口頭説明記録を提出する。",
+    "title": "科目B準備：アルゴリズム基本構造",
+    "description": "科目Bの擬似言語に備えて、順次・分岐・反復、変数追跡、配列の基礎を確認する。",
     "itemType": "assignment",
     "priority": 10,
     "dueTime": "23:59",
-    "allowedEvidenceTypes": ["photo", "text", "audio", "video"],
-    "deliverables": ["3構造の説明", "手書きフローチャート2つ", "口頭説明実施の記録"],
-    "acceptanceCriteria": ["3構造を区別できる", "フローチャートが処理として成立", "Shomaが承認"]
+    "allowedEvidenceTypes": [
+      "photo",
+      "text",
+      "audio",
+      "video"
+    ],
+    "deliverables": [
+      "順次・分岐・反復それぞれの短い説明",
+      "手書きまたはテキストのフローチャート2本",
+      "擬似コード確認問題10問の結果（正答数つき）",
+      "変数の値が変わる過程を書いた問題2問",
+      "間違えた問題の再回答"
+    ],
+    "acceptanceCriteria": [
+      "3構造を区別できる",
+      "フローチャートが入力から出力まで成立している",
+      "擬似コード10問の正答数が書かれている",
+      "変数の追跡過程を見て説明できる"
+    ],
+    "sourceUrl": "https://www.ipa.go.jp/shiken/syllabus/gaiyou.html"
   },
   {
     "key": "taiga-2026-08-01-weekly-flowchart",
     "date": "2026-08-01",
     "title": "週次成果物：学習結果判定フロー",
-    "description": "1週間の学習結果を判定する処理を手書きフローチャートとして作成する。",
+    "description": "1週間の学習結果を判定する処理を、入力・判定・出力・未提出時の扱いまで含めてフローチャート化する。",
     "itemType": "assignment",
     "priority": 10,
     "dueTime": "23:59",
-    "allowedEvidenceTypes": ["photo", "text"],
-    "deliverables": ["入力", "判定", "出力", "未提出時の処理", "改善案"],
-    "acceptanceCriteria": ["一連の流れが成立", "未提出ケースが考慮されている", "Shomaが承認"]
+    "allowedEvidenceTypes": [
+      "photo",
+      "text"
+    ],
+    "deliverables": [
+      "入力項目一覧（提出有無、問題数、正答数、スクリーンショット有無）",
+      "判定条件一覧（合格、要対応、未提出）",
+      "完成したフローチャートの写真または画像1枚以上",
+      "テストケース3件（合格、要対応、未提出）",
+      "改善したい点1つ"
+    ],
+    "acceptanceCriteria": [
+      "入力・処理・出力がそろっている",
+      "未提出ケースが分岐として入っている",
+      "3つのテストケースで判定結果が矛盾しない",
+      "フローチャートを見て第三者が処理を追える"
+    ],
+    "sourceUrl": "https://www.ipa.go.jp/shiken/syllabus/gaiyou.html"
   },
   {
     "key": "taiga-2026-08-02-weekly-test-recovery",
     "date": "2026-08-02",
-    "title": "週次試験・未完了回収",
-    "description": "科目A相当30問、間違い直し、未提出課題の提出、自己評価、翌週改善策を提出する。",
+    "title": "週次確認：科目A30問・科目B5問",
+    "description": "IPA公開問題・サンプル問題の形式に寄せて、科目A相当30問と科目B相当5問を解き、間違いを全回収する。",
     "itemType": "assignment",
     "priority": 10,
     "dueTime": "23:59",
-    "allowedEvidenceTypes": ["screenshot", "photo", "text"],
-    "deliverables": ["科目A相当30問", "間違い直し", "未提出課題", "1週間の自己評価", "翌週改善策"],
-    "acceptanceCriteria": ["未提出が残っていない、または理由と再提出日が確定", "間違い直しがある", "Shomaが週次判定を完了"]
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "photo",
+      "text"
+    ],
+    "deliverables": [
+      "科目A相当30問の結果（正答数、正答率、スクリーンショット）",
+      "科目B相当5問の結果（正答数、正答率、スクリーンショット）",
+      "間違えた全問題の番号と正しい答え",
+      "未提出または未完了の一覧と再提出日",
+      "翌週の重点分野を3つ"
+    ],
+    "acceptanceCriteria": [
+      "科目A30問と科目B5問を解いた証跡がある",
+      "間違い直しが全問分ある",
+      "未完了が残る場合は日付つきで回収計画がある",
+      "翌週の重点分野が具体的に書かれている"
+    ],
+    "sourceUrl": "https://www.ipa.go.jp/shiken/mondai-kaiotu/index.html"
   },
   {
     "key": "taiga-2026-08-16-pc-purchase",
     "date": "2026-08-16",
     "title": "PC購入予定日",
-    "description": "PC購入状況、初期設定に必要なもの、翌日からのPC課題開始可否を確認する。",
+    "description": "PCの購入または準備状況を確認し、翌日から学習・提出に使える状態か判断する。",
     "itemType": "milestone",
     "priority": 5,
     "dueTime": "20:00",
-    "allowedEvidenceTypes": ["photo", "text"],
-    "deliverables": ["購入または準備状況", "不足物リスト"],
-    "acceptanceCriteria": ["PC課題開始可否が判断できる"]
+    "allowedEvidenceTypes": [
+      "photo",
+      "text"
+    ],
+    "deliverables": [
+      "PC本体または注文完了画面の写真/スクリーンショット",
+      "OS、メモリ、ストレージ容量のメモ",
+      "ブラウザ、Googleアカウント、GitHubログイン可否",
+      "不足物リスト（なければ「なし」）",
+      "翌日から使えるかの判断"
+    ],
+    "acceptanceCriteria": [
+      "PCの準備状況が証跡で確認できる",
+      "最低限のスペックとログイン可否が書かれている",
+      "不足物がある場合は入手日が書かれている",
+      "学習開始可否を判断できる"
+    ],
+    "sourceUrl": null
   },
   {
-    "key": "taiga-2026-09-05-open-school",
-    "date": "2026-09-05",
-    "title": "42 Tokyoオープンスクール・現地見学",
-    "description": "42 Tokyoの説明、キャンパス見学、ピアラーニング体験、質疑応答、個別相談に参加する。",
-    "itemType": "orientation",
+    "key": "taiga-2026-08-17-terminal-git-start",
+    "date": "2026-08-17",
+    "title": "Piscine準備：ターミナルとGit初日",
+    "description": "PC購入後すぐに、ターミナル操作とGit/GitHubの最低限を実機で確認する。",
+    "itemType": "assignment",
+    "priority": 9,
+    "dueTime": "23:59",
+    "sourceUrl": "https://docs.github.com/en/get-started",
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "pwd/ls/cd/mkdir/touch/cat/rmを実行したターミナルスクリーンショット",
+      "GitHubに練習リポジトリを1つ作成したスクリーンショット",
+      "git clone/add/commit/pushを1回ずつ実行したログ",
+      "詰まったコマンドと解決方法3つ",
+      "翌日もう一度打つコマンド一覧"
+    ],
+    "acceptanceCriteria": [
+      "ターミナル基本操作を実機で実行している",
+      "GitHubにpushできている",
+      "コマンドを丸写しではなく用途で説明している",
+      "詰まった点が具体的に書かれている"
+    ]
+  },
+  {
+    "key": "taiga-2026-08-18-c-first-compile",
+    "date": "2026-08-18",
+    "title": "Piscine準備：Cの初回コンパイル",
+    "description": "Piscineに備えて、Cファイル作成、コンパイル、実行、エラー修正を実機で1周する。",
+    "itemType": "assignment",
+    "priority": 9,
+    "dueTime": "23:59",
+    "sourceUrl": "https://devdocs.io/c/",
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "hello world相当のCコード",
+      "ccまたはgccでコンパイルしたターミナルスクリーンショット",
+      "実行結果のスクリーンショット",
+      "わざと出したコンパイルエラー1つと修正内容",
+      "main/printf/returnの説明"
+    ],
+    "acceptanceCriteria": [
+      "Cコードを自分のPCでコンパイルしている",
+      "実行結果が確認できる",
+      "コンパイルエラーを1つ修正している",
+      "main/printf/returnを自分の言葉で説明している"
+    ]
+  },
+  {
+    "key": "taiga-2026-08-19-daily-c-practice-start",
+    "date": "2026-08-19",
+    "title": "Piscine準備：C基礎演習10問",
+    "description": "変数、条件分岐、ループ、関数の基礎を小問10問で確認し、毎日コードを書く状態に入る。",
+    "itemType": "assignment",
+    "priority": 9,
+    "dueTime": "23:59",
+    "sourceUrl": "https://devdocs.io/c/",
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "C基礎小問10問のコードまたはスクリーンショット",
+      "コンパイル成功数と失敗数",
+      "実行結果3問分のスクリーンショット",
+      "一番詰まった問題の原因と修正内容",
+      "翌日やるC演習の範囲"
+    ],
+    "acceptanceCriteria": [
+      "10問分の取り組みが確認できる",
+      "最低7問はコンパイル成功している",
+      "失敗した問題の原因が書かれている",
+      "翌日の演習範囲が決まっている"
+    ]
+  },
+  {
+    "key": "taiga-2026-08-23-weekly-piscine-readiness",
+    "date": "2026-08-23",
+    "title": "週次確認：Piscine基礎耐性チェック",
+    "description": "PC購入後1週間の実操作を確認し、ターミナル・Git・C・説明力が最低ラインに乗っているか判定する。",
+    "itemType": "review",
+    "priority": 8,
+    "dueTime": "23:59",
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "ターミナル基本操作チェック10個の結果",
+      "Git clone/add/commit/pushを何も見ずに1周したログ",
+      "C小問15問の結果（成功数、失敗数）",
+      "人に説明できるようになったこと3つ",
+      "翌週の弱点補強リスト"
+    ],
+    "acceptanceCriteria": [
+      "ターミナル操作10個を実行できている",
+      "Git操作を1周できている",
+      "C小問15問中10問以上がコンパイル成功している",
+      "弱点補強リストが具体的である"
+    ]
+  },
+  {
+    "key": "taiga-2026-08-24-42-web-test",
+    "date": "2026-08-24",
+    "title": "42 Tokyo Webテスト本番",
+    "description": "9月5日の現地見学に余裕を持って進めるよう、42 TokyoのWEB出願サイトに登録し、エンジニア適性テスト2ゲームを8月24日に完了する。",
+    "itemType": "application",
     "priority": 5,
-    "sourceUrl": "https://42tokyo.jp/events/"
+    "sourceUrl": "https://apply.42tokyo.jp/users/sign_up",
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "photo",
+      "text"
+    ],
+    "deliverables": [
+      "WEB出願サイトのアカウント登録完了スクリーンショット",
+      "エンジニア適性テスト2ゲームの実施結果スクリーンショット",
+      "合格画面、または次に表示された案内のスクリーンショット",
+      "9月5日の現地見学に参加できる状態かのYes/No",
+      "不合格だった場合の8月25日再挑戦予定時刻"
+    ],
+    "acceptanceCriteria": [
+      "9月5日の10日以上前に2ゲームを実施している",
+      "結果または次画面の証跡がある",
+      "合格時は9月5日の現地見学に進む準備ができている",
+      "不合格時は8月25日の再挑戦時刻が決まっている"
+    ]
+  },
+  {
+    "key": "taiga-2026-08-25-42-web-test-retry",
+    "date": "2026-08-25",
+    "title": "42 Tokyo Webテスト再挑戦・結果確定",
+    "description": "8月24日にWebテスト未合格または未完了だった場合の再挑戦日。合格済みの場合は結果証跡と次手続きを確定する。",
+    "itemType": "application",
+    "priority": 6,
+    "sourceUrl": "https://apply.42tokyo.jp/users/sign_up",
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "再挑戦した場合は2ゲームの結果スクリーンショット",
+      "合格済みの場合は合格画面または次画面のスクリーンショット",
+      "9月5日の現地見学に進めるかのYes/No",
+      "進めない場合の再挑戦・問い合わせ・代替日",
+      "次に必要な申込/確認タスク"
+    ],
+    "acceptanceCriteria": [
+      "8月中にWebテスト結果が確定している",
+      "結果証跡を確認できる",
+      "9月5日の現地見学に進めるか判断できる",
+      "進めない場合の代替行動が決まっている"
+    ]
+  },
+  {
+    "key": "taiga-2026-08-26-open-school-prep",
+    "itemType": "application",
+    "priority": 8,
+    "sourceUrl": "https://42tokyo.jp/events/",
+    "date": "2026-08-26",
+    "title": "42 Tokyo現地見学準備",
+    "description": "Webテスト結果を踏まえて、9月5日の現地見学または学校説明会に参加するための案内、持ち物、質問を準備する。",
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "9月5日の参加案内またはイベントページのスクリーンショット",
+      "集合時刻・場所・移動経路",
+      "持ち物一覧",
+      "現地で確認する質問5つ",
+      "Introduction Meeting/Piscine申込について確認する項目"
+    ],
+    "acceptanceCriteria": [
+      "9月5日の参加条件と場所が確認できる",
+      "移動経路と集合時刻が決まっている",
+      "質問が5つあり、Piscine申込条件を確認できる"
+    ]
   },
   {
     "key": "taiga-2026-09-05-introduction-meeting-confirm",
     "date": "2026-09-05",
-    "title": "正式Introduction Meeting扱いか確認",
-    "description": "オープンスクールがPiscine申込みに必要な正式Introduction Meetingとして扱われるか現地で確認する。",
+    "title": "Introduction Meeting参加要否確認",
+    "description": "9月5日の現地見学で、9月30日のIntroduction Meeting参加が必要か、オンライン視聴で足りるか、Piscine申込条件を確認する。",
     "itemType": "application",
     "priority": 6,
     "dueTime": "23:59",
     "sourceUrl": "https://42tokyo.jp/requirements/",
-    "allowedEvidenceTypes": ["photo", "text"],
-    "deliverables": ["確認結果", "確認した相手または案内の記録"],
-    "acceptanceCriteria": ["9月30日の予定を残すか不要にするか判断できる"]
+    "allowedEvidenceTypes": [
+      "photo",
+      "text"
+    ],
+    "deliverables": [
+      "9月30日のIntroduction Meetingが必要か不要かの確認結果",
+      "確認した相手、メール、ページのいずれかの証跡",
+      "Piscine申込に必要な残タスク一覧",
+      "必要な場合のIntroduction Meeting申込期限と申込URL"
+    ],
+    "acceptanceCriteria": [
+      "9月30日の参加要否がYes/Noで書かれている",
+      "根拠となるメール・ページ・担当者情報がある",
+      "Piscine申込に必要な残タスクが具体的に書かれている"
+    ]
+  },
+  {
+    "key": "taiga-2026-09-05-open-school",
+    "date": "2026-09-05",
+    "title": "42 Tokyo現地見学・学校説明会",
+    "description": "8月中にWebテスト結果を確定した状態で、42 Tokyo現地見学または学校説明会に参加し、Piscine申込に必要な次手続きを確認する。",
+    "itemType": "orientation",
+    "priority": 5,
+    "sourceUrl": "https://42tokyo.jp/events/",
+    "allowedEvidenceTypes": [
+      "photo",
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "Webテスト合格または参加対象であることが分かるスクリーンショット",
+      "現地見学または学校説明会の参加証跡（受付メール、案内、写真のいずれか）",
+      "当日確認した内容3点",
+      "質問したことと回答1件以上",
+      "Piscine申込までに次にやる手続きと期限"
+    ],
+    "acceptanceCriteria": [
+      "8月中にWebテスト結果が確定している",
+      "参加または案内の証跡がある",
+      "42 Tokyoで確認した事実が3点以上ある",
+      "Piscine申込までの次手続きが日付つきで決まっている"
+    ]
   },
   {
     "key": "taiga-2026-09-06-vaundy-live",
     "date": "2026-09-06",
     "title": "Vaundyライブ",
-    "description": "予定あり。翌日の未完了回収に影響しないよう前日までに必須課題を確認する。",
+    "description": "前日の現地見学で確認した手続きを整理し、ライブ予定と衝突しない範囲で次の申込準備だけ行う。",
     "itemType": "milestone",
-    "priority": 20
-  },
-  {
-    "key": "taiga-2026-09-07-42-web-test",
-    "date": "2026-09-07",
-    "title": "42 Tokyo Webテスト",
-    "description": "42 Tokyo出願フローのWebテストを受け、結果と次の手続きを記録する。",
-    "itemType": "application",
-    "priority": 5,
-    "sourceUrl": "https://apply.42tokyo.jp/users/sign_up",
-    "allowedEvidenceTypes": ["screenshot", "photo", "text"],
-    "deliverables": ["Webテスト実施記録", "結果", "次の手続き"],
-    "acceptanceCriteria": ["実施日と結果が分かる", "次に必要な手続きが分かる"]
+    "priority": 20,
+    "allowedEvidenceTypes": [
+      "text"
+    ],
+    "deliverables": [
+      "9月5日に確認した次手続きの一覧",
+      "9月30日のIntroduction Meetingが必要かどうか",
+      "翌週にやる申込/確認タスク",
+      "ライブ当日に学習を詰め込まない予定"
+    ],
+    "acceptanceCriteria": [
+      "現地見学後の次手続きが整理されている",
+      "9月30日の予定を残すか判断できる",
+      "無理な学習予定を入れていない"
+    ]
   },
   {
     "key": "taiga-2026-09-30-introduction-meeting-candidate",
@@ -144,7 +489,22 @@
     "description": "9月5日の確認で正式扱いではなかった場合の第一候補。不要ならShomaが対象外へ変更する。",
     "itemType": "application",
     "priority": 5,
-    "sourceUrl": "https://42tokyo.jp/events/"
+    "sourceUrl": "https://42tokyo.jp/events/",
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "Introduction Meeting申込完了または参加案内のスクリーンショット",
+      "参加日時と参加方法",
+      "説明会で確認する質問3つ",
+      "参加後に必要なPiscine申込手順"
+    ],
+    "acceptanceCriteria": [
+      "参加対象条件を満たしていることが分かる",
+      "申込または参加案内の証跡がある",
+      "Piscine申込に進めるか判断できる"
+    ]
   },
   {
     "key": "taiga-2026-10-03-fe-exam",
@@ -152,7 +512,23 @@
     "title": "基本情報技術者試験",
     "description": "10月3日の基本情報技術者試験本番。",
     "itemType": "exam",
-    "priority": 1
+    "priority": 1,
+    "allowedEvidenceTypes": [
+      "photo",
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "受験予約または受験票情報の確認メモ",
+      "試験前チェックリスト（本人確認書類、会場/時刻、持ち物）",
+      "受験後の自己採点または手応えメモ",
+      "結果確認予定日"
+    ],
+    "acceptanceCriteria": [
+      "受験日時と会場/方法が確認できる",
+      "当日の持ち物と移動が確認済み",
+      "受験後に次の学習判断ができるメモがある"
+    ]
   },
   {
     "key": "taiga-2026-11-01-housing-start",
@@ -160,7 +536,22 @@
     "title": "本格的な部屋探し開始",
     "description": "家賃3万円程度を希望条件として候補エリアとシェアハウス候補を集め始める。",
     "itemType": "housing",
-    "priority": 8
+    "priority": 8,
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "候補エリア3つと42 Tokyoまでの通学時間",
+      "家賃3万円前後の候補物件またはシェアハウス5件のURL",
+      "初期費用、月額費用、入居条件の比較表",
+      "問い合わせ優先順位トップ3"
+    ],
+    "acceptanceCriteria": [
+      "候補5件以上を比較している",
+      "通学時間と月額費用が書かれている",
+      "次に問い合わせる物件が決まっている"
+    ]
   },
   {
     "key": "taiga-2026-12-01-online-viewing-start",
@@ -168,7 +559,23 @@
     "title": "オンライン内見・候補絞り込み開始",
     "description": "候補物件へ問い合わせ、オンライン内見、通学時間確認を始める。",
     "itemType": "housing",
-    "priority": 8
+    "priority": 8,
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "問い合わせ済み物件3件以上の一覧",
+      "オンライン内見予約または返信スクリーンショット",
+      "各候補のメリット/不安点",
+      "第一候補と第二候補",
+      "次の連絡日"
+    ],
+    "acceptanceCriteria": [
+      "3件以上に実際に問い合わせている",
+      "内見または返信の証跡がある",
+      "候補順位と次の行動が決まっている"
+    ]
   },
   {
     "key": "taiga-2026-12-15-contract-decision",
@@ -176,7 +583,23 @@
     "title": "契約判断の内部期限",
     "description": "住居契約を進めるか、代替案を取るかをShomaと判断する。",
     "itemType": "housing",
-    "priority": 5
+    "priority": 5,
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "契約候補1〜2件の最終比較",
+      "初期費用と1月〜3月の支払い見込み",
+      "契約に必要な書類一覧",
+      "契約する/保留する/代替案にする判断",
+      "判断理由"
+    ],
+    "acceptanceCriteria": [
+      "費用と条件を比較している",
+      "必要書類が分かっている",
+      "契約判断が理由つきで書かれている"
+    ]
   },
   {
     "key": "taiga-2026-12-31-savings-check-600k",
@@ -185,9 +608,23 @@
     "description": "現在貯金、当月収入、当月支出、目標との差、翌月の必要貯金額を提出する。",
     "itemType": "finance",
     "priority": 5,
-    "allowedEvidenceTypes": ["screenshot", "photo", "text"],
-    "deliverables": ["現在貯金の証跡", "当月収入", "当月支出", "目標との差", "翌月の必要貯金額"],
-    "acceptanceCriteria": ["最低50万円、推奨60万円、安全70万円との差が分かる"]
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "photo",
+      "text"
+    ],
+    "deliverables": [
+      "現在貯金額の証跡（スクリーンショットまたは写真）",
+      "12月の収入合計",
+      "12月の支出合計",
+      "50万円・60万円・70万円との差額",
+      "1月に必要な貯金額と削る支出"
+    ],
+    "acceptanceCriteria": [
+      "現在貯金額を証跡で確認できる",
+      "収入・支出・差額が数字で書かれている",
+      "1月の改善アクションが金額つきで決まっている"
+    ]
   },
   {
     "key": "taiga-2027-01-11-tokyo-commute-check",
@@ -195,7 +632,24 @@
     "title": "東京生活・通学確認開始",
     "description": "住居から42 Tokyoまでの通学経路、所要時間、生活導線を確認する。",
     "itemType": "travel",
-    "priority": 5
+    "priority": 5,
+    "allowedEvidenceTypes": [
+      "photo",
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "住居から42 Tokyoまでの経路スクリーンショット",
+      "実測または検索上の所要時間",
+      "最寄り駅、乗換回数、終電/始発の確認",
+      "生活に必要な店/病院/役所など3か所",
+      "通学で不安な点と対策"
+    ],
+    "acceptanceCriteria": [
+      "42 Tokyoまでの通学経路が確認できる",
+      "所要時間と乗換が書かれている",
+      "生活導線の最低限が確認できている"
+    ]
   },
   {
     "key": "taiga-2027-02-01-mock-piscine-start",
@@ -203,7 +657,23 @@
     "title": "模擬Piscine強化期間開始",
     "description": "制限時間課題、レビュー依頼、説明練習を高密度で回す。",
     "itemType": "milestone",
-    "priority": 5
+    "priority": 5,
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "C言語またはシェル基礎課題1題の提出URL/スクリーンショット",
+      "制限時間つき演習の開始時刻と終了時刻",
+      "調べたこと3つ",
+      "人に説明できるようになったこと1つ",
+      "翌日の改善点"
+    ],
+    "acceptanceCriteria": [
+      "制限時間内に1題取り組んだ証跡がある",
+      "自分で調べた内容が具体的に書かれている",
+      "翌日の改善点が1つ以上ある"
+    ]
   },
   {
     "key": "taiga-2027-02-22-final-adjustment-start",
@@ -211,7 +681,23 @@
     "title": "本番直前調整開始",
     "description": "睡眠、移動、持ち物、Git/C言語の最終確認に切り替える。",
     "itemType": "milestone",
-    "priority": 5
+    "priority": 5,
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "Git基本操作チェック結果（clone/add/commit/push）",
+      "C言語基礎チェック結果（コンパイル、標準出力、配列、関数）",
+      "睡眠・移動・食事の本番週ルール",
+      "不足している持ち物/設定一覧",
+      "Piscine初日にやることリスト"
+    ],
+    "acceptanceCriteria": [
+      "GitとCの最低限操作が確認できる",
+      "本番週の生活ルールが決まっている",
+      "不足物と解消日が書かれている"
+    ]
   },
   {
     "key": "taiga-2027-02-28-final-rest",
@@ -219,7 +705,22 @@
     "title": "前日準備・休養",
     "description": "Piscine前日の準備と休養。新しい重い課題は入れない。",
     "itemType": "rest",
-    "priority": 5
+    "priority": 5,
+    "allowedEvidenceTypes": [
+      "photo",
+      "text"
+    ],
+    "deliverables": [
+      "持ち物チェックリスト完了写真またはメモ",
+      "翌日の起床時刻・移動時刻・到着予定時刻",
+      "緊急連絡先と交通代替案",
+      "新しく詰め込まない確認事項リスト"
+    ],
+    "acceptanceCriteria": [
+      "翌日の移動と持ち物が確認済み",
+      "緊急時の代替案がある",
+      "休養を優先する状態になっている"
+    ]
   },
   {
     "key": "taiga-2027-04-02-piscine-result",
@@ -228,7 +729,23 @@
     "description": "合格発表を確認し、結果と次の手続きを記録する。",
     "itemType": "milestone",
     "priority": 5,
-    "sourceUrl": "https://42tokyo.jp/requirements/"
+    "sourceUrl": "https://42tokyo.jp/requirements/",
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "text"
+    ],
+    "deliverables": [
+      "Piscine結果画面または通知のスクリーンショット",
+      "合否結果",
+      "次に必要な手続きと期限",
+      "不合格時の再挑戦可否と次の候補日",
+      "4週間でできるようになったこと3つ"
+    ],
+    "acceptanceCriteria": [
+      "結果を証跡で確認できる",
+      "次の手続きが日付つきで書かれている",
+      "不合格時も次の判断ができる"
+    ]
   },
   {
     "key": "taiga-2027-04-14-entrance-ceremony",
@@ -237,6 +754,22 @@
     "description": "春入学式。",
     "itemType": "milestone",
     "priority": 5,
-    "sourceUrl": "https://42tokyo.jp/requirements/"
+    "sourceUrl": "https://42tokyo.jp/requirements/",
+    "allowedEvidenceTypes": [
+      "screenshot",
+      "photo",
+      "text"
+    ],
+    "deliverables": [
+      "入学式または初回案内の日時・場所",
+      "必要な持ち物/アカウント/書類一覧",
+      "当日の移動予定",
+      "入学後1週間の行動リスト"
+    ],
+    "acceptanceCriteria": [
+      "日時・場所・持ち物が確認済み",
+      "当日の移動に無理がない",
+      "入学後の初動が決まっている"
+    ]
   }
 ]

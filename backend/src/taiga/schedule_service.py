@@ -31,8 +31,8 @@ from taiga.schedule_domain import (
 PISCINE_START = date(2027, 3, 1)
 IMPORTANT_SCHEDULE_KEYS = frozenset(
     {
+        "taiga-2026-08-24-42-web-test",
         "taiga-2026-09-05-open-school",
-        "taiga-2026-09-07-42-web-test",
         "taiga-2026-10-03-fe-exam",
         "taiga-2027-01-11-tokyo-commute-check",
         "taiga-2027-03-01-piscine",

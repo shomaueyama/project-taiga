@@ -150,7 +150,7 @@ function installFetch(
                 date: "2026-07-27",
                 startAt: null,
                 endAt: null,
-                title: "基本情報：既習範囲の確認",
+                title: "基本情報：ハードウェア現在地確認",
                 description: "現在地確認を提出する。",
                 itemType: "milestone",
                 assignmentId,
@@ -180,8 +180,8 @@ function installFetch(
         todayCount: 1,
         learnerOverdueCount: 1,
         reviewWaitingCount: 0,
-        nextImportantDate: "2026-09-05",
-        nextImportantTitle: "42 Tokyoオープンスクール・現地見学",
+        nextImportantDate: "2026-08-24",
+        nextImportantTitle: "42 Tokyo Webテスト本番",
         daysUntilPiscine: 218,
       });
     }
@@ -197,7 +197,7 @@ function installFetch(
             date: "2026-07-27",
             startAt: null,
             endAt: null,
-            title: "基本情報：既習範囲の確認",
+            title: "基本情報：ハードウェア現在地確認",
             description: "現在地確認を提出する。",
             itemType: "milestone",
             assignmentId,
@@ -560,7 +560,7 @@ describe("App", () => {
     renderApp(["/schedule"]);
 
     expect(await screen.findByRole("heading", { name: "スケジュール" })).toBeInTheDocument();
-    expect(await screen.findAllByText("基本情報：既習範囲の確認")).not.toHaveLength(0);
+    expect(await screen.findAllByText("基本情報：ハードウェア現在地確認")).not.toHaveLength(0);
     expect(screen.getByLabelText("カレンダー凡例")).toHaveTextContent("重要日");
     expect(await screen.findAllByText("遅延")).not.toHaveLength(0);
     expect(screen.getByText("根拠URL未設定")).toBeInTheDocument();

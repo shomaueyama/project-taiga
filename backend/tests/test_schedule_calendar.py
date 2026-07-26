@@ -64,7 +64,7 @@ def test_schedule_seed_has_daily_records_and_required_milestones(seeded_schedule
                     FROM schedule_items
                     WHERE schedule_key IN (
                       'taiga-2026-09-05-open-school',
-                      'taiga-2026-09-07-42-web-test',
+                      'taiga-2026-08-24-42-web-test',
                       'taiga-2026-10-03-fe-exam',
                       'taiga-2027-01-11-tokyo-commute-check',
                       'taiga-2027-03-01-piscine'
@@ -75,7 +75,7 @@ def test_schedule_seed_has_daily_records_and_required_milestones(seeded_schedule
         )
         assert keys == {
             "taiga-2026-09-05-open-school",
-            "taiga-2026-09-07-42-web-test",
+            "taiga-2026-08-24-42-web-test",
             "taiga-2026-10-03-fe-exam",
             "taiga-2027-01-11-tokyo-commute-check",
             "taiga-2027-03-01-piscine",
@@ -92,7 +92,7 @@ def test_schedule_api_returns_month_days_and_assignment_links(seeded_schedule: N
     assert len(body["days"]) == 7
     first_day = body["days"][0]
     assert first_day["date"] == "2026-07-27"
-    assert first_day["items"][0]["title"] == "基本情報：既習範囲の確認"
+    assert first_day["items"][0]["title"] == "基本情報：ハードウェア現在地確認"
     assert first_day["items"][0]["metadata"]["allowedEvidenceTypes"] == [
         "screenshot",
         "photo",
@@ -100,7 +100,7 @@ def test_schedule_api_returns_month_days_and_assignment_links(seeded_schedule: N
     ]
     second_day = body["days"][1]
     assert second_day["date"] == "2026-07-28"
-    assert second_day["items"][0]["title"] == "ハードウェア範囲を完了"
+    assert second_day["items"][0]["title"] == "基本情報：ハードウェア範囲完了判定"
 
 
 def test_schedule_day_and_summary_are_available_to_admin(seeded_schedule: None) -> None:
@@ -108,13 +108,13 @@ def test_schedule_day_and_summary_are_available_to_admin(seeded_schedule: None) 
     day = client.get("/api/v1/schedule/2026-09-05", headers=headers("admin@example.local"))
     assert day.status_code == 200
     titles = {item["title"] for item in day.json()["items"]}
-    assert "42 Tokyoオープンスクール・現地見学" in titles
-    assert "正式Introduction Meeting扱いか確認" in titles
+    assert "42 Tokyo現地見学・学校説明会" in titles
+    assert "Introduction Meeting参加要否確認" in titles
 
     summary = client.get("/api/v1/schedule/summary", headers=headers("admin@example.local"))
     assert summary.status_code == 200
-    assert summary.json()["nextImportantDate"] == "2026-09-05"
-    assert summary.json()["nextImportantTitle"] == "42 Tokyoオープンスクール・現地見学"
+    assert summary.json()["nextImportantDate"] == "2026-08-24"
+    assert summary.json()["nextImportantTitle"] == "42 Tokyo Webテスト本番"
     assert summary.json()["daysUntilPiscine"] > 0
 
 
