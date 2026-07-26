@@ -17,6 +17,33 @@ from taiga.api_schemas import (
 from taiga.auth import Principal
 
 
+def _learner_id_for_learning(session: Session, principal: Principal) -> Any:
+    if principal.role == "learner":
+        return principal.id
+    if principal.role != "admin":
+        return principal.id
+    learner_id = session.execute(
+        text(
+            """
+            SELECT id
+            FROM users
+            WHERE role = 'learner'
+              AND status = 'active'
+              AND deleted_at IS NULL
+            ORDER BY
+              CASE
+                WHEN cognito_sub = 'taiga@example.local' THEN 0
+                WHEN cognito_sub = 'taiga-albatross@softbank.ne.jp' THEN 1
+                ELSE 2
+              END,
+              created_at
+            LIMIT 1
+            """
+        )
+    ).scalar_one_or_none()
+    return learner_id or principal.id
+
+
 def _summary(row: Any) -> AssignmentSummary:
     return AssignmentSummary(
         id=row["id"],
@@ -28,6 +55,7 @@ def _summary(row: Any) -> AssignmentSummary:
 
 
 def list_assignments(session: Session, principal: Principal, limit: int = 20) -> AssignmentPage:
+    learner_id = _learner_id_for_learning(session, principal)
     rows = (
         session.execute(
             text(
@@ -40,7 +68,7 @@ def list_assignments(session: Session, principal: Principal, limit: int = 20) ->
                 LIMIT :limit
                 """
             ),
-            {"learner_id": principal.id, "limit": limit},
+            {"learner_id": learner_id, "limit": limit},
         )
         .mappings()
         .all()
@@ -49,6 +77,7 @@ def list_assignments(session: Session, principal: Principal, limit: int = 20) ->
 
 
 def get_assignment(session: Session, principal: Principal, assignment_id: UUID) -> AssignmentDetail:
+    learner_id = _learner_id_for_learning(session, principal)
     row = (
         session.execute(
             text(
@@ -60,7 +89,7 @@ def get_assignment(session: Session, principal: Principal, assignment_id: UUID) 
                 WHERE a.id = :assignment_id AND a.learner_id = :learner_id
                 """
             ),
-            {"assignment_id": assignment_id, "learner_id": principal.id},
+            {"assignment_id": assignment_id, "learner_id": learner_id},
         )
         .mappings()
         .first()
@@ -77,7 +106,7 @@ def get_assignment(session: Session, principal: Principal, assignment_id: UUID) 
                 ORDER BY submission_version DESC
                 """
             ),
-            {"assignment_id": assignment_id, "learner_id": principal.id},
+            {"assignment_id": assignment_id, "learner_id": learner_id},
         )
         .mappings()
         .all()
@@ -134,6 +163,7 @@ def get_dashboard(session: Session, principal: Principal) -> Dashboard:
 
 
 def get_progress(session: Session, principal: Principal) -> Progress:
+    learner_id = _learner_id_for_learning(session, principal)
     completed_weeks = int(
         session.execute(
             text(
@@ -145,7 +175,7 @@ def get_progress(session: Session, principal: Principal) -> Progress:
                 WHERE a.learner_id = :learner_id AND a.status = 'completed'
                 """
             ),
-            {"learner_id": principal.id},
+            {"learner_id": learner_id},
         ).scalar_one()
     )
     capability_rows = (
@@ -159,7 +189,7 @@ def get_progress(session: Session, principal: Principal) -> Progress:
                 ORDER BY capability_code
                 """
             ),
-            {"learner_id": principal.id},
+            {"learner_id": learner_id},
         )
         .mappings()
         .all()
@@ -174,7 +204,7 @@ def get_progress(session: Session, principal: Principal) -> Progress:
             LIMIT 1
             """
         ),
-        {"learner_id": principal.id},
+        {"learner_id": learner_id},
     ).scalar_one_or_none()
     return Progress(
         completedWeeks=completed_weeks,

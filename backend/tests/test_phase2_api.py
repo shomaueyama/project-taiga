@@ -126,6 +126,21 @@ def test_assignment_dashboard_detail_progress_and_ownership(
     progress = client.get("/api/v1/progress", headers=headers())
     assert progress.status_code == 200
     assert progress.json()["completedWeeks"] >= 0
+    admin_assignments = client.get(
+        "/api/v1/assignments?limit=3",
+        headers=headers("admin@example.local"),
+    )
+    assert admin_assignments.status_code == 200
+    assert len(admin_assignments.json()["items"]) == 3
+    assert admin_assignments.json()["items"][0]["id"] == assignment_id
+    admin_detail = client.get(
+        f"/api/v1/assignments/{assignment_id}",
+        headers=headers("admin@example.local"),
+    )
+    assert admin_detail.status_code == 200
+    admin_dashboard = client.get("/api/v1/dashboard", headers=headers("admin@example.local"))
+    assert admin_dashboard.status_code == 200
+    assert len(admin_dashboard.json()["today"]) > 0
     reviewer_detail = client.get(
         f"/api/v1/assignments/{assignment_id}",
         headers=headers("reviewer@example.local"),

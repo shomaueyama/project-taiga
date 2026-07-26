@@ -180,7 +180,7 @@ export function App() {
   const featureFlags = useQuery({
     queryKey: ["feature-flags", localUser],
     queryFn: getFeatureFlags,
-    enabled: canAdmin,
+    enabled: canAdmin && isLocalEnvironment,
   });
   const analytics = useQuery({
     queryKey: ["analytics", localUser],
@@ -679,21 +679,25 @@ export function App() {
                   <Alert tone="danger">課題を読み込めません。権限またはURLを確認してください。</Alert>
                 ) : null}
               </div>
-              <button
-                type="button"
-                className="primary-action"
-                disabled={!firstAssignment || submitAssignment.isPending}
-                onClick={() => firstAssignment && submitAssignment.mutate(firstAssignment.id)}
-              >
-                デモ回答を提出
-              </button>
-              <p aria-live="polite">
-                {lastSubmissionId
-                  ? `提出を作成しました: ${lastSubmissionId}`
-                  : submitAssignment.error
-                    ? "提出に失敗しました。入力と権限を確認してください。"
-                    : "新しい提出はまだありません。"}
-              </p>
+              {isLocalEnvironment ? (
+                <>
+                  <button
+                    type="button"
+                    className="primary-action"
+                    disabled={!firstAssignment || submitAssignment.isPending}
+                    onClick={() => firstAssignment && submitAssignment.mutate(firstAssignment.id)}
+                  >
+                    デモ回答を提出
+                  </button>
+                  <p aria-live="polite">
+                    {lastSubmissionId
+                      ? `提出を作成しました: ${lastSubmissionId}`
+                      : submitAssignment.error
+                        ? "提出に失敗しました。入力と権限を確認してください。"
+                        : "新しい提出はまだありません。"}
+                  </p>
+                </>
+              ) : null}
             </section>
           ) : null}
 

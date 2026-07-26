@@ -57,6 +57,7 @@ function installFetch(
   options: {
     runnerEnabled?: boolean;
     examEnabled?: boolean;
+    appEnv?: string;
     todayAssignment?: boolean;
     completedWeeks?: number | null;
   } = {},
@@ -72,7 +73,7 @@ function installFetch(
     if (path === "/api/health") {
       return response({
         status: "ok",
-        app_env: "local",
+        app_env: options.appEnv ?? "local",
         runner_enabled: options.runnerEnabled ?? false,
         exam_enabled: options.examEnabled ?? false,
       });
@@ -369,6 +370,16 @@ describe("App", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "提出を実行確認する" }));
     expect(await screen.findByText("完了")).toBeInTheDocument();
+  });
+
+  it("hides local-only demo submission controls in production", async () => {
+    installFetch({ appEnv: "production" });
+    renderApp(["/assignments"]);
+
+    expect(await screen.findByText("Typing basics")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "デモ回答を提出" })).not.toBeInTheDocument();
+    expect(screen.queryByText("新しい提出はまだありません。")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "ログアウト" })).toBeInTheDocument();
   });
 
   it("renders populated dashboard rows, opens assignment detail, and handles mobile drawer", async () => {
