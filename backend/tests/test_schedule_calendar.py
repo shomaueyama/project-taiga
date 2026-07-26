@@ -108,13 +108,13 @@ def test_schedule_day_and_summary_are_available_to_admin(seeded_schedule: None) 
     day = client.get("/api/v1/schedule/2026-09-05", headers=headers("admin@example.local"))
     assert day.status_code == 200
     titles = {item["title"] for item in day.json()["items"]}
-    assert "42 Tokyo高校生向けオープンスクール・現地見学" in titles
+    assert "42 Tokyoオープンスクール・現地見学" in titles
     assert "正式Introduction Meeting扱いか確認" in titles
 
     summary = client.get("/api/v1/schedule/summary", headers=headers("admin@example.local"))
     assert summary.status_code == 200
     assert summary.json()["nextImportantDate"] == "2026-09-05"
-    assert summary.json()["nextImportantTitle"] == "42 Tokyo高校生向けオープンスクール・現地見学"
+    assert summary.json()["nextImportantTitle"] == "42 Tokyoオープンスクール・現地見学"
     assert summary.json()["daysUntilPiscine"] > 0
 
 

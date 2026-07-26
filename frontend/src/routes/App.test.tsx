@@ -181,7 +181,7 @@ function installFetch(
         learnerOverdueCount: 1,
         reviewWaitingCount: 0,
         nextImportantDate: "2026-09-05",
-        nextImportantTitle: "42 Tokyo高校生向けオープンスクール・現地見学",
+        nextImportantTitle: "42 Tokyoオープンスクール・現地見学",
         daysUntilPiscine: 218,
       });
     }
