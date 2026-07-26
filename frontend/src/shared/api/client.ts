@@ -592,17 +592,33 @@ async function uploadEvidenceFile(file: File): Promise<string> {
 
 export async function submitAssignmentEvidence(
   assignmentId: string,
-  input: { title: string; learnedOn: string; note: string; attachments: File[] },
+  input: {
+    title: string;
+    learnedOn: string;
+    activity: string;
+    result: string;
+    nextStep: string;
+    attachments: File[];
+  },
 ): Promise<Submission> {
   const title = input.title.trim();
   const learnedOn = input.learnedOn.trim();
-  const note = input.note.trim();
+  const activity = input.activity.trim();
+  const result = input.result.trim();
+  const nextStep = input.nextStep.trim();
   const body = [
     `# ${title}`,
     "",
     `日付: ${learnedOn}`,
     "",
-    note || "提出メモは未入力です。",
+    "## 取り組んだ内容",
+    activity,
+    "",
+    "## 結果・できるようになったこと",
+    result,
+    "",
+    "## 困ったこと・次にやること",
+    nextStep || "特になし",
   ]
     .filter(Boolean)
     .join("\n");

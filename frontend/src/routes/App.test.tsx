@@ -245,7 +245,7 @@ function installFetch(
           },
         ],
         requiredArtifacts: [{ path: "answer.md", kind: "file" }],
-        submissionGuide: ["教材を開く。", "学習メモを書いて提出する。"],
+        submissionGuide: ["学習記録を書く。"],
         submissionSpec: {},
         submissions: [
           {
@@ -452,7 +452,7 @@ describe("App", () => {
     renderApp();
 
     await screen.findByText("上山 虎雅 · 学習者");
-    fireEvent.click(screen.getByRole("link", { name: "教材" }));
+    fireEvent.click(screen.getByRole("link", { name: "記録" }));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "デモ回答を提出" })).toBeEnabled(),
     );
@@ -471,9 +471,10 @@ describe("App", () => {
     installFetch({ appEnv: "production" });
     renderApp(["/assignments"]);
 
-    expect(await screen.findByText("Typing basics")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "学習記録" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "デモ回答を提出" })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "デモ回答を提出" })).not.toBeInTheDocument(),
+    );
     expect(screen.queryByText("新しい提出はまだありません。")).not.toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "提出履歴" })).toBeInTheDocument();
     expect(screen.getByText("v1")).toBeInTheDocument();
@@ -486,15 +487,21 @@ describe("App", () => {
     const { calls } = installFetch({ appEnv: "production" });
     renderApp(["/assignments"]);
 
-    expect(await screen.findByText("e-typing")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "学習記録を提出" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("タイトル"), {
-      target: { value: "e-typing 腕試し" },
+      target: { value: "タイピング練習" },
     });
     fireEvent.change(screen.getByLabelText("日付"), {
       target: { value: "2026-07-26" },
     });
-    fireEvent.change(screen.getByLabelText("学習メモ"), {
-      target: { value: "タイピング練習を完了しました。" },
+    fireEvent.change(screen.getByLabelText("取り組んだ内容"), {
+      target: { value: "タイピング練習を3回やった。" },
+    });
+    fireEvent.change(screen.getByLabelText("結果・できるようになったこと"), {
+      target: { value: "ホームポジションを見ないで打てる時間が増えた。" },
+    });
+    fireEvent.change(screen.getByLabelText("困ったこと・次にやること（任意）"), {
+      target: { value: "次は数字キーを練習する。" },
     });
     expect(screen.getByLabelText("写真ライブラリ・ファイル添付（任意）")).not.toHaveAttribute("capture");
     fireEvent.click(screen.getByRole("button", { name: "提出する" }));
@@ -543,8 +550,9 @@ describe("App", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "ナビゲーションを開く" }));
-    fireEvent.click(screen.getByRole("link", { name: "教材" }));
-    expect(await screen.findByLabelText("教材詳細")).toHaveTextContent("Typing basics");
+    fireEvent.click(screen.getByRole("link", { name: "記録" }));
+    expect(await screen.findByRole("heading", { name: "学習記録を提出" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("内部課題詳細")).not.toBeInTheDocument();
   });
 
   it("shows the schedule calendar and opens linked assignments", async () => {

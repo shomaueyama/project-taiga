@@ -74,7 +74,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { path: "/dashboard", label: "ダッシュボード", roles: ["learner", "reviewer", "admin"], icon: LayoutDashboard },
   { path: "/schedule", label: "スケジュール", roles: ["learner", "admin"], icon: CalendarDays },
-  { path: "/assignments", label: "教材", roles: ["learner", "admin"], icon: BookOpen },
+  { path: "/assignments", label: "記録", roles: ["learner"], icon: BookOpen },
   { path: "/reviews", label: "レビュー", roles: ["reviewer", "admin"], icon: CheckSquare },
   { path: "/runner", label: "実行環境", roles: ["learner", "admin"], icon: PlayCircle },
   { path: "/exams", label: "試験", roles: ["learner", "admin"], icon: GraduationCap },
@@ -125,7 +125,9 @@ export function App() {
   const [assignmentForm, setAssignmentForm] = useState({
     title: "",
     learnedOn: todayIsoDate(),
-    note: "",
+    activity: "",
+    result: "",
+    nextStep: "",
     attachments: [] as File[],
   });
   const [loginEmail, setLoginEmail] = useState("");
@@ -244,7 +246,14 @@ export function App() {
       submitAssignmentEvidence(assignmentId, assignmentForm),
     onSuccess: async (submission) => {
       setLastSubmissionId(submission.id);
-      setAssignmentForm({ title: "", learnedOn: todayIsoDate(), note: "", attachments: [] });
+      setAssignmentForm({
+        title: "",
+        learnedOn: todayIsoDate(),
+        activity: "",
+        result: "",
+        nextStep: "",
+        attachments: [],
+      });
       await queryClient.invalidateQueries({ queryKey: ["assignments", localUser] });
       await queryClient.invalidateQueries({ queryKey: ["assignment-detail", localUser] });
       await queryClient.invalidateQueries({ queryKey: ["dashboard", localUser] });
@@ -382,7 +391,8 @@ export function App() {
       !selectedAssignment ||
       !assignmentForm.title.trim() ||
       !assignmentForm.learnedOn ||
-      (!assignmentForm.note.trim() && assignmentForm.attachments.length === 0)
+      !assignmentForm.activity.trim() ||
+      !assignmentForm.result.trim()
     ) {
       return;
     }
@@ -639,7 +649,7 @@ export function App() {
               <PageHeader
                 eyebrow="MISSION CONTROL"
                 title="ダッシュボード"
-                description="学習の現在地、次に進む教材、運用状態を確認できます。"
+                description="学習の現在地、次に提出する記録、運用状態を確認できます。"
                 titleId="dashboard-title"
               />
               {dashboard.isLoading || progress.isLoading || scheduleSummary.isLoading ? <LoadingState /> : null}
@@ -648,7 +658,7 @@ export function App() {
                 daysUntilPiscine={daysUntilPiscine}
                 overdueCount={scheduleSummary.data?.learnerOverdueCount ?? 0}
                 reviewWaitingCount={scheduleSummary.data?.reviewWaitingCount ?? 0}
-                nextAction={firstAssignment?.title ?? "次の教材を確認"}
+                nextAction={firstAssignment?.title ?? "次の記録を提出"}
               />
               <section className="nova-card task-card" aria-labelledby="today-task-title">
                 <div className="section-heading">
@@ -781,109 +791,19 @@ export function App() {
               <PageHeader
                 eyebrow="LEARNING LOG"
                 title="学習記録"
-                description="タイトルと日付を入れて、既存教材で取り組んだ内容を提出できます。"
+                description="その日に取り組んだ内容を、タイトル・日付・メモ・写真で提出できます。"
                 titleId="assignments-title"
               />
-              {assignments.isLoading ? <LoadingState label="教材を読み込み中です" /> : null}
-              {assignments.data?.items.length === 0 ? (
-                <EmptyState title="表示できる教材はありません。" />
+              {!canSubmitAssignment ? (
+                <Alert tone="info">学習記録は学習者用です。提出内容の確認はレビュー画面で行います。</Alert>
               ) : null}
-              <div className="detail-box" aria-label="教材詳細">
-                <div className="assignment-detail-header">
-                  <div>
-                    <strong>{assignmentDetail.data?.assignment.title ?? "教材を選択してください"}</strong>
-                    {assignmentDetail.data?.goal ? <p>{assignmentDetail.data.goal}</p> : null}
-                  </div>
-                  <StatusBadge status={assignmentDetail.data?.assignment.status} />
-                </div>
-                {assignmentDetail.isError ? (
-                  <Alert tone="danger">教材を読み込めません。権限またはURLを確認してください。</Alert>
-                ) : null}
-                {assignmentDetail.data ? (
-                  <div className="assignment-detail-grid">
-                    <section className="assignment-panel" aria-labelledby="assignment-materials-title">
-                      <h2 id="assignment-materials-title">教材</h2>
-                      <div className="material-list">
-                        {assignmentDetail.data.materials.map((material) => (
-                          <article className="material-item" key={material.id}>
-                            <div>
-                              <strong>{material.title}</strong>
-                              <span>
-                                {material.provider} · {material.required ? "必須" : "参考"}
-                              </span>
-                            </div>
-                            {material.url ? (
-                              <a href={material.url} target="_blank" rel="noreferrer">
-                                開く
-                              </a>
-                            ) : (
-                              <span>手元教材</span>
-                            )}
-                          </article>
-                        ))}
-                      </div>
-                    </section>
-                    <section className="assignment-panel" aria-labelledby="assignment-steps-title">
-                      <h2 id="assignment-steps-title">進め方</h2>
-                      <ol className="plain-list">
-                        {assignmentDetail.data.instructions.map((item) => (
-                          <li key={item}>{item}</li>
-                        ))}
-                      </ol>
-                    </section>
-                    <section className="assignment-panel assignment-history-panel" aria-labelledby="assignment-history-title">
-                      <h2 id="assignment-history-title">提出履歴</h2>
-                      {assignmentDetail.data.submissions.length > 0 ? (
-                        <div className="submission-history-list">
-                          {assignmentDetail.data.submissions.map((submission) => (
-                            <article className="submission-history-item" key={submission.id}>
-                              <div className="submission-history-heading">
-                                <strong>v{submission.version}</strong>
-                                <StatusBadge status={submission.status} />
-                                <time dateTime={submission.createdAt}>{formatDate(submission.createdAt)}</time>
-                              </div>
-                              {submission.repositoryUrl ? (
-                                <a href={submission.repositoryUrl} target="_blank" rel="noreferrer">
-                                  GitHub URLを開く
-                                </a>
-                              ) : null}
-                              {submission.commitHash ? <p>Commit: {submission.commitHash}</p> : null}
-                              {submission.submissionNote ? (
-                                <p className="submission-note-preview">{submission.submissionNote}</p>
-                              ) : null}
-                              {(submission.artifactLinks ?? []).length > 0 ? (
-                                <div className="attachment-link-list" aria-label="提出添付">
-                                  {(submission.artifactLinks ?? []).map((artifact) => (
-                                    <a
-                                      key={artifact.id}
-                                      href={`/api/v1/submission-artifacts/${artifact.id}/content`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      {artifact.originalName}
-                                    </a>
-                                  ))}
-                                </div>
-                              ) : null}
-                              {submission.reviewResult ? (
-                                <div className="review-result-box">
-                                  <strong>レビュー: {labelForStatus(submission.reviewResult)}</strong>
-                                  {submission.reviewComment ? <p>{submission.reviewComment}</p> : null}
-                                  {submission.reviewedAt ? (
-                                    <time dateTime={submission.reviewedAt}>{formatDate(submission.reviewedAt)}</time>
-                                  ) : null}
-                                </div>
-                              ) : null}
-                            </article>
-                          ))}
-                        </div>
-                      ) : (
-                        <p>提出はまだありません。</p>
-                      )}
-                    </section>
-                  </div>
-                ) : null}
-              </div>
+              {canSubmitAssignment && assignments.isLoading ? <LoadingState label="記録画面を読み込み中です" /> : null}
+              {assignments.data?.items.length === 0 ? (
+                <EmptyState title="提出先を準備中です。" />
+              ) : null}
+              {canSubmitAssignment && assignmentDetail.isError ? (
+                <Alert tone="danger">記録画面を読み込めません。権限またはURLを確認してください。</Alert>
+              ) : null}
               {canSubmitAssignment && assignmentDetail.data ? (
                 <form className="submission-form" onSubmit={submitAssignmentForm}>
                   <div className="section-heading">
@@ -895,7 +815,7 @@ export function App() {
                     <input
                       required
                       value={assignmentForm.title}
-                      placeholder="例: e-typing 腕試しを3回やった"
+                      placeholder="例: タイピング練習を3回やった"
                       onChange={(event) =>
                         setAssignmentForm((current) => ({
                           ...current,
@@ -919,15 +839,42 @@ export function App() {
                     />
                   </label>
                   <label>
-                    学習メモ
+                    取り組んだ内容
                     <textarea
-                      required={assignmentForm.attachments.length === 0}
-                      value={assignmentForm.note}
-                      placeholder="使った教材、やった範囲、できたこと、詰まったところを書く"
+                      required
+                      value={assignmentForm.activity}
+                      placeholder="例: 基本情報のハードウェア範囲、タイピング練習、過去問10問"
                       onChange={(event) =>
                         setAssignmentForm((current) => ({
                           ...current,
-                          note: event.target.value,
+                          activity: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    結果・できるようになったこと
+                    <textarea
+                      required
+                      value={assignmentForm.result}
+                      placeholder="例: 正答数、完了した範囲、説明できるようになったこと"
+                      onChange={(event) =>
+                        setAssignmentForm((current) => ({
+                          ...current,
+                          result: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    困ったこと・次にやること（任意）
+                    <textarea
+                      value={assignmentForm.nextStep}
+                      placeholder="例: CPUキャッシュが曖昧。明日は用語を確認して問題を解く"
+                      onChange={(event) =>
+                        setAssignmentForm((current) => ({
+                          ...current,
+                          nextStep: event.target.value,
                         }))
                       }
                     />
@@ -963,7 +910,8 @@ export function App() {
                         submitEvidence.isPending ||
                         !assignmentForm.title.trim() ||
                         !assignmentForm.learnedOn ||
-                        (!assignmentForm.note.trim() && assignmentForm.attachments.length === 0)
+                        !assignmentForm.activity.trim() ||
+                        !assignmentForm.result.trim()
                       }
                     >
                       提出する
@@ -974,9 +922,55 @@ export function App() {
                       ? `提出しました。レビュー待ちです: ${shortId(lastSubmissionId)}`
                       : submitEvidence.error
                         ? "提出に失敗しました。入力内容を確認してください。"
-                        : "タイトル、日付、学習メモまたは写真添付を入れて提出できます。"}
+                        : "タイトル、日付、取り組んだ内容、結果を入れると提出できます。写真は必要に応じて添付してください。"}
                   </p>
                 </form>
+              ) : null}
+              {canSubmitAssignment && assignmentDetail.data ? (
+                <section className="detail-box assignment-history-panel" aria-labelledby="assignment-history-title">
+                  <h2 id="assignment-history-title">提出履歴</h2>
+                  {assignmentDetail.data.submissions.length > 0 ? (
+                    <div className="submission-history-list">
+                      {assignmentDetail.data.submissions.map((submission) => (
+                        <article className="submission-history-item" key={submission.id}>
+                          <div className="submission-history-heading">
+                            <strong>v{submission.version}</strong>
+                            <StatusBadge status={submission.status} />
+                            <time dateTime={submission.createdAt}>{formatDate(submission.createdAt)}</time>
+                          </div>
+                          {submission.submissionNote ? (
+                            <p className="submission-note-preview">{submission.submissionNote}</p>
+                          ) : null}
+                          {(submission.artifactLinks ?? []).length > 0 ? (
+                            <div className="attachment-link-list" aria-label="提出添付">
+                              {(submission.artifactLinks ?? []).map((artifact) => (
+                                <a
+                                  key={artifact.id}
+                                  href={`/api/v1/submission-artifacts/${artifact.id}/content`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  {artifact.originalName}
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
+                          {submission.reviewResult ? (
+                            <div className="review-result-box">
+                              <strong>レビュー: {labelForStatus(submission.reviewResult)}</strong>
+                              {submission.reviewComment ? <p>{submission.reviewComment}</p> : null}
+                              {submission.reviewedAt ? (
+                                <time dateTime={submission.reviewedAt}>{formatDate(submission.reviewedAt)}</time>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>提出はまだありません。</p>
+                  )}
+                </section>
               ) : null}
               {isLocalEnvironment ? (
                 <>
