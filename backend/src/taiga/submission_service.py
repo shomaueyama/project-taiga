@@ -269,8 +269,11 @@ def upload_content(
 
     if status == "accepted":
         target = Path(get_settings().local_storage_root) / "uploads" / row["object_key"]
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(content)
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(content)
+        except OSError:
+            pass
 
     session.execute(
         text(
@@ -278,8 +281,9 @@ def upload_content(
             UPDATE upload_sessions
             SET actual_size_bytes = :size_bytes,
                 actual_sha256 = :sha256,
-                scan_status = :status,
+                scan_status = CAST(:status AS upload_scan_status),
                 rejection_code = :rejection_code,
+                uploaded_blob = CASE WHEN :accepted THEN :content ELSE NULL END,
                 completed_at = now()
             WHERE id = :id AND owner_id = :owner_id
             """
@@ -291,6 +295,8 @@ def upload_content(
             "sha256": sha256,
             "status": status,
             "rejection_code": rejection_code,
+            "accepted": status == "accepted",
+            "content": content,
         },
     )
     return get_upload(session, principal, upload_id)
