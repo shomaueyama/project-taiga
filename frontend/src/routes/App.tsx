@@ -85,6 +85,12 @@ function routeTitle(pathname: string) {
   return NAV_ITEMS.find((item) => item.path === group)?.label ?? "ページが見つかりません";
 }
 
+function navItemsForEnvironment(isLocalEnvironment: boolean) {
+  return isLocalEnvironment
+    ? NAV_ITEMS
+    : NAV_ITEMS.filter((item) => !["/runner", "/exams"].includes(item.path));
+}
+
 export function App() {
   const queryClient = useQueryClient();
   const location = useLocation();
@@ -305,7 +311,8 @@ export function App() {
   const firstExam = exams.data?.items[0];
   const runnerDisabled = health.data?.runner_enabled === false;
   const examDisabled = !examEnabled;
-  const visibleNav = NAV_ITEMS.filter((item) => item.roles.includes(me.data?.role ?? "learner"));
+  const availableNav = navItemsForEnvironment(isLocalEnvironment);
+  const visibleNav = availableNav.filter((item) => item.roles.includes(me.data?.role ?? "learner"));
   const missionProgress = calculateMissionProgress(progress.data?.completedWeeks);
 
   useEffect(() => {
@@ -459,14 +466,18 @@ export function App() {
               <dt>API</dt>
               <dd>{health.isSuccess ? labelForStatus(health.data.status) : "確認中"}</dd>
             </div>
-            <div>
-              <dt>実行環境</dt>
-              <dd>{health.data?.runner_enabled ? "有効" : "停止中"}</dd>
-            </div>
-            <div>
-              <dt>試験</dt>
-              <dd>{health.data?.exam_enabled ? "有効" : "停止中"}</dd>
-            </div>
+            {isLocalEnvironment ? (
+              <>
+                <div>
+                  <dt>実行環境</dt>
+                  <dd>{health.data?.runner_enabled ? "有効" : "停止中"}</dd>
+                </div>
+                <div>
+                  <dt>試験</dt>
+                  <dd>{health.data?.exam_enabled ? "有効" : "停止中"}</dd>
+                </div>
+              </>
+            ) : null}
           </dl>
         </header>
 
@@ -490,7 +501,7 @@ export function App() {
               <PageHeader
                 eyebrow="MISSION CONTROL"
                 title="ダッシュボード"
-                description="学習の現在地、次に進む課題、ローカル環境の状態を確認できます。"
+                description="学習の現在地、次に進む課題、運用状態を確認できます。"
                 titleId="dashboard-title"
               />
               {dashboard.isLoading || progress.isLoading ? <LoadingState /> : null}
@@ -522,7 +533,9 @@ export function App() {
               </section>
               <div className="card-grid dashboard-metrics">
                 <Metric label="完了週" value={progress.data?.completedWeeks ?? 0} />
-                <Metric label="次の試験" value={dashboard.data?.nextExam?.stableCode ?? "予定なし"} />
+                {isLocalEnvironment ? (
+                  <Metric label="次の試験" value={dashboard.data?.nextExam?.stableCode ?? "予定なし"} />
+                ) : null}
                 <Metric label="ランク" value={progress.data?.rank ?? "未判定"} />
               </div>
               <Alert tone="info">TAIGA NOVAは直接URL、ブラウザ更新、戻る操作に対応しています。</Alert>
@@ -736,7 +749,7 @@ export function App() {
             </section>
           ) : null}
 
-          {activeRoute === "/runner" ? (
+          {isLocalEnvironment && activeRoute === "/runner" ? (
             <section className="page-stack" aria-labelledby="runner-title">
               <PageHeader
                 eyebrow="LOCAL RUNNER"
@@ -766,7 +779,7 @@ export function App() {
             </section>
           ) : null}
 
-          {activeRoute === "/exams" ? (
+          {isLocalEnvironment && activeRoute === "/exams" ? (
             <section className="page-stack" aria-labelledby="exams-title">
               <PageHeader
                 eyebrow="EXAM GATE"
@@ -826,7 +839,7 @@ export function App() {
             </section>
           ) : null}
 
-          {!NAV_ITEMS.some((item) => item.path === activeRoute) ? (
+          {!availableNav.some((item) => item.path === activeRoute) ? (
             <section className="page-stack not-found">
               <PageHeader
                 eyebrow="OFF ORBIT"
@@ -851,7 +864,7 @@ function BrandLockup({ compact = false }: { compact?: boolean }) {
       <img src={novaMark} width="44" height="44" alt="" aria-hidden="true" />
       <div>
         <p>TAIGA NOVA</p>
-        {!compact ? <span>Local Mission Control</span> : null}
+        {!compact ? <span>Mission Control</span> : null}
       </div>
     </div>
   );
