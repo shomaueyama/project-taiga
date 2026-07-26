@@ -158,9 +158,24 @@ def _seed_curriculum_assignments(session: Session, learner_id: uuid.UUID) -> int
             list[dict[str, Any]],
             submission_spec.get("artifacts", []) if isinstance(submission_spec, dict) else [],
         )
+        artifact_paths = [artifact.get("path", "提出物") for artifact in artifacts]
         evidence_types = ["file", "github_url", "screenshot", "text"]
         if scheduled_date < date(2026, 8, 16):
             evidence_types = ["screenshot", "photo", "text", "audio", "video"]
+        generated_deliverables = [
+            *(artifact_paths or ["回答またはコード"]),
+            "実行結果または採点結果のスクリーンショット",
+            "自分で確認したテストケース3件",
+            "詰まった点と調べたこと",
+            "次に直す点または次に進む範囲",
+        ]
+        generated_criteria = [
+            *instructions.get("approvalCriteria", []),
+            "提出物を第三者が開いて確認できる",
+            "実行結果または採点結果の証跡がある",
+            "テストケース3件で確認している",
+            "詰まった点を隠さず書いている",
+        ]
         _upsert_item(
             session,
             key=f"taiga-{scheduled_date.isoformat()}-{row['stable_code'].lower()}",
@@ -175,27 +190,59 @@ def _seed_curriculum_assignments(session: Session, learner_id: uuid.UUID) -> int
             is_required=row["required"],
             metadata={
                 "objective": row["goal"],
-                "deliverables": [
-                    artifact.get("path", "提出物")
-                    for artifact in artifacts
-                ],
-                "acceptanceCriteria": instructions.get("approvalCriteria", []),
+                "deliverables": generated_deliverables,
+                "acceptanceCriteria": generated_criteria,
                 "allowedEvidenceTypes": evidence_types,
-                "nextAction": "課題詳細を開いて提出物を作成する",
+                "nextAction": "学習記録に成果物、実行証跡、詰まった点を提出する",
             },
         )
     return len(rows)
 
 
-def _fe_pre_pc_item(day: date) -> tuple[str, str]:
+def _fe_pre_pc_item(day: date) -> tuple[str, str, list[str], list[str]]:
     topics = [
-        ("基本情報：用語カード作成", "分からない用語を10個選び、自分の言葉で説明する。"),
-        ("基本情報：計算問題", "2進数、論理演算、単位変換の問題を解き、計算過程を残す。"),
-        ("基本情報：科目A演習", "科目A相当の問題を20問解き、間違い直しを提出する。"),
-        ("基本情報：科目B読解", "疑似言語問題を5問読み、処理の流れをノートに書く。"),
-        ("復習・再提出回収", "未完了または修正依頼中の成果物を最優先で回収する。"),
-        ("週次レビュー準備", "今週の成果物、未完了、質問事項をShomaに見せられる形にする。"),
-        ("週次試験", "科目A相当30問と間違い直しを提出する。"),
+        (
+            "基本情報：用語カード作成",
+            "分からない用語を10個選び、自分の言葉で説明する。",
+            ["用語10個", "各用語の自分の説明", "理解できた/未理解の区分"],
+            ["10語すべてに説明がある", "未理解語に翌日の確認方法がある"],
+        ),
+        (
+            "基本情報：計算問題",
+            "2進数、論理演算、単位変換の問題を合計20問解き、計算過程を残す。",
+            ["計算問題20問の正答数", "途中式の写真またはテキスト", "間違い直し全問"],
+            ["20問解いた証跡がある", "途中式で解法を追える", "間違い直しが全問ある"],
+        ),
+        (
+            "基本情報：科目A演習",
+            "科目A相当の問題を25問解き、正答数、正答率、間違い直しを提出する。",
+            ["科目A25問の正答数と正答率", "採点結果スクリーンショット", "間違い直し全問"],
+            ["25問解いた証跡がある", "正答率が数字で分かる", "間違い直しが全問ある"],
+        ),
+        (
+            "基本情報：科目B読解",
+            "擬似言語問題を5問読み、処理の流れと変数の変化をノートに書く。",
+            ["科目B相当5問の正答数", "変数追跡メモ2問分", "間違い直し全問"],
+            ["5問解いた証跡がある", "変数の変化を追っている", "間違い直しが全問ある"],
+        ),
+        (
+            "復習・再提出回収",
+            "未完了または修正依頼中の成果物を最優先で回収し、残件を0に近づける。",
+            ["未完了一覧", "回収した提出物", "残件と再提出日"],
+            ["未完了を隠していない", "回収結果が確認できる", "残件に日付がある"],
+        ),
+        (
+            "週次レビュー準備",
+            "今週の成果物、未完了、質問事項をShomaに見せられる形に整理する。",
+            ["今週の提出一覧", "未完了一覧", "質問3つ", "翌週の重点3つ"],
+            ["提出状況を一覧で確認できる", "質問と翌週重点が具体的である"],
+        ),
+        (
+            "週次試験",
+            "科目A相当30問と科目B相当5問を解き、間違い直しを提出する。",
+            ["科目A30問の正答数", "科目B5問の正答数", "採点証跡", "間違い直し全問"],
+            ["科目A/Bの両方を解いている", "正答数が数字で分かる", "間違い直しが全問ある"],
+        ),
     ]
     return topics[day.weekday()]
 
@@ -204,7 +251,7 @@ def _seed_pre_pc_days(session: Session, learner_id: uuid.UUID) -> int:
     count = 0
     day = date(2026, 8, 3)
     while day <= date(2026, 8, 15):
-        title, description = _fe_pre_pc_item(day)
+        title, description, deliverables, criteria = _fe_pre_pc_item(day)
         _upsert_item(
             session,
             key=f"taiga-{day.isoformat()}-fe-pre-pc",
@@ -217,12 +264,8 @@ def _seed_pre_pc_days(session: Session, learner_id: uuid.UUID) -> int:
             due_at=_due_at(day, "23:59"),
             metadata={
                 "objective": description,
-                "deliverables": ["スクリーンショット", "ノート写真", "回答テキスト"],
-                "acceptanceCriteria": [
-                    "実施内容が判読できる",
-                    "分からない点を隠していない",
-                    "Shomaが承認",
-                ],
+                "deliverables": deliverables,
+                "acceptanceCriteria": criteria,
                 "allowedEvidenceTypes": ["screenshot", "photo", "text", "audio", "video"],
                 "nextAction": "スマホまたはノートで証跡を残して提出する",
             },
@@ -255,8 +298,17 @@ def _seed_month_end_finance(session: Session, learner_id: uuid.UUID) -> int:
             due_at=_due_at(day, "23:59"),
             metadata={
                 "objective": "上京とPiscine参加に向けた資金状況を隠さず確認する",
-                "deliverables": ["現在貯金の証跡", "当月収入", "当月支出", "目標との差"],
-                "acceptanceCriteria": ["最低50万円、推奨60万円、安全70万円との差が分かる"],
+                "deliverables": [
+                    "現在貯金額の証跡",
+                    "当月収入と当月支出",
+                    "50万円・60万円・70万円との差額",
+                    "翌月に増やす貯金額",
+                ],
+                "acceptanceCriteria": [
+                    "金額が数字で書かれている",
+                    "証跡で確認できる",
+                    "翌月の改善アクションが金額つきである",
+                ],
                 "allowedEvidenceTypes": ["screenshot", "photo", "text"],
                 "nextAction": "金額を事実として固定せず、確認結果を提出する",
             },
@@ -289,8 +341,34 @@ def _seed_ranges(session: Session, learner_id: uuid.UUID) -> int:
                 source_url=OFFICIAL_REQUIREMENTS_URL if item_type == "piscine" else None,
                 metadata={
                     "objective": title,
-                    "deliverables": ["当日の実施記録", "翌日の最優先事項"],
-                    "acceptanceCriteria": ["次の行動が明確になっている"],
+                    "deliverables": (
+                        [
+                            "当日の課題提出または演習ログ",
+                            "レビューを受けた件数",
+                            "詰まった点と調べたこと",
+                            "翌日の最優先事項",
+                        ]
+                        if item_type == "piscine"
+                        else [
+                            "移動または生活導線の確認結果",
+                            "写真またはスクリーンショット",
+                            "未解決事項と次の行動",
+                            "翌日に確認する場所または手続き",
+                        ]
+                    ),
+                    "acceptanceCriteria": (
+                        [
+                            "当日取り組んだ内容が証跡で分かる",
+                            "レビュー/詰まり/翌日タスクが書かれている",
+                            "翌日すぐ動ける状態になっている",
+                        ]
+                        if item_type == "piscine"
+                        else [
+                            "移動・生活上の確認結果が具体的である",
+                            "未解決事項に期限がある",
+                            "翌日の確認対象が決まっている",
+                        ]
+                    ),
                     "allowedEvidenceTypes": ["screenshot", "photo", "text"],
                     "nextAction": "当日の結果を記録する",
                 },
@@ -298,6 +376,181 @@ def _seed_ranges(session: Session, learner_id: uuid.UUID) -> int:
             count += 1
             day += timedelta(days=1)
     return count
+
+
+def _daily_marker_plan(day: date) -> tuple[str, str, str, list[str], list[str], list[str]]:
+    weekday = day.weekday()
+    if day < date(2026, 8, 16):
+        title, description, deliverables, criteria = _fe_pre_pc_item(day)
+        return title, description, "assignment" if weekday < 5 else "review", deliverables, criteria, [
+            "screenshot",
+            "photo",
+            "text",
+        ]
+    if day < date(2026, 8, 24):
+        plans = [
+            (
+                "Piscine準備：ターミナル反復",
+                "pwd/ls/cd/mkdir/touch/cat/rm/grep相当を手で打ち、用途を説明する。",
+                ["コマンド8個の実行ログ", "各コマンドの用途", "失敗した操作と修正"],
+                ["8個以上を実行している", "用途を自分の言葉で説明している"],
+            ),
+            (
+                "Piscine準備：Git反復",
+                "clone/add/commit/status/log/diff/pushを1周し、履歴を確認する。",
+                ["Git操作1周のログ", "commit hash", "GitHub画面スクリーンショット"],
+                ["push結果が確認できる", "status/log/diffの意味を書いている"],
+            ),
+            (
+                "Piscine準備：C基礎演習",
+                "Cの小問10問を解き、コンパイルと実行を繰り返す。",
+                ["C小問10問の成功数", "コンパイルログ", "失敗した問題の原因"],
+                ["10問取り組んでいる", "7問以上コンパイル成功、または失敗原因が全問ある"],
+            ),
+            (
+                "Piscine準備：エラー修正",
+                "Cのコンパイルエラーと実行時の想定違いを3件作り、直し方を記録する。",
+                ["エラー3件", "修正前後のコード", "修正理由", "再発防止メモ"],
+                ["3件とも修正理由がある", "同じミスを防ぐメモがある", "修正後に実行確認している"],
+            ),
+            (
+                "Piscine準備：説明練習",
+                "今日書いたコードまたはコマンドを、Shomaに説明できる形にまとめる。",
+                ["説明メモ3点", "コードまたはログ", "処理の流れ", "質問したい点"],
+                ["第三者が内容を追える", "質問が具体的である", "処理の入口と出口を説明している"],
+            ),
+            (
+                "Piscine準備：制限時間演習",
+                "45分でターミナル/Git/Cの小課題を1題解き、時間内に提出する。",
+                ["開始時刻と終了時刻", "提出物", "実行結果", "時間切れの場合の原因"],
+                ["45分以内の取り組みが分かる", "実行結果を確認できる", "時間切れ時の改善がある"],
+            ),
+            (
+                "週次確認：実操作レビュー",
+                "ターミナル、Git、Cの実操作を週次で確認し、翌週の弱点を決める。",
+                ["Git操作1周", "C小問15問の結果", "弱点3つ"],
+                ["Git操作が通っている", "C小問の成功数が分かる", "弱点が具体的である"],
+            ),
+        ]
+        title, description, deliverables, criteria = plans[weekday]
+        return title, description, "assignment" if weekday < 6 else "review", deliverables, criteria, [
+            "screenshot",
+            "text",
+            "github_url",
+        ]
+    if day < date(2026, 10, 4):
+        plans = [
+            (
+                "基本情報：科目A演習40問",
+                "科目A相当40問を解き、弱点分野と間違い直しを残す。",
+                ["科目A40問の正答数", "採点スクリーンショット", "間違い直し全問"],
+                ["40問解いた証跡がある", "正答率と弱点分野が書かれている"],
+            ),
+            (
+                "基本情報：科目Bアルゴリズム10問",
+                "科目B相当の擬似言語・変数追跡を10問解く。",
+                ["科目B10問の正答数", "変数追跡メモ3問分", "間違い直し全問"],
+                ["10問解いた証跡がある", "変数追跡を説明できる"],
+            ),
+            (
+                "Piscine準備：C演習15問",
+                "FE学習と並行してC小問15問をコンパイルまで行う。",
+                ["C小問15問の成功数", "コンパイルログ", "失敗原因"],
+                ["15問取り組んでいる", "10問以上成功または原因整理がある"],
+            ),
+            (
+                "基本情報：弱点分野回収",
+                "直近の誤答から弱点2分野を選び、各15問ずつ解く。",
+                ["弱点2分野", "各15問の正答数", "間違い直し"],
+                ["合計30問解いている", "弱点の理由が書かれている"],
+            ),
+            (
+                "科目B：情報セキュリティ演習",
+                "科目Bの情報セキュリティ相当問題を5問、関連する科目Aを15問解く。",
+                ["科目Bセキュリティ5問", "科目A関連15問", "誤答メモ"],
+                ["合計20問の結果がある", "セキュリティ用語を説明できる"],
+            ),
+            (
+                "模試：FE短縮セット",
+                "科目A30問・科目B10問を時間を測って解く。",
+                ["開始/終了時刻", "科目A30問の正答数", "科目B10問の正答数", "誤答全問直し"],
+                ["時間を測っている", "両科目の正答数が分かる", "誤答直しがある"],
+            ),
+            (
+                "週次確認：FE/Piscine両立レビュー",
+                "FEの点数推移とC/Git実操作の継続状況を確認する。",
+                ["今週の問題数合計", "科目A/Bの正答率推移", "C/Git実操作日数", "翌週重点3つ"],
+                ["数値で推移を確認できる", "翌週重点が具体的である"],
+            ),
+        ]
+        title, description, deliverables, criteria = plans[weekday]
+        return title, description, "assignment" if weekday < 6 else "review", deliverables, criteria, [
+            "screenshot",
+            "photo",
+            "text",
+            "github_url",
+        ]
+    if day < date(2027, 3, 1):
+        phase = "上京後" if day >= date(2027, 1, 11) else "Piscine準備"
+        plans = [
+            (
+                f"{phase}：C演習20問",
+                "Cの基礎問題を20問解き、コンパイル・実行・失敗原因を残す。",
+                ["C小問20問の成功数", "コンパイルログ", "失敗原因と修正内容"],
+                ["20問取り組んでいる", "15問以上成功、または失敗原因が全問ある"],
+            ),
+            (
+                f"{phase}：アルゴリズム実装",
+                "配列、文字列、探索、ソートのうち1テーマをCで実装する。",
+                ["実装テーマ", "コード", "実行結果", "テストケース3件"],
+                ["コードがコンパイルできる", "テストケース3件がある"],
+            ),
+            (
+                f"{phase}：Gitレビュー練習",
+                "Gitで小さな変更を3commitに分け、差分を説明する。",
+                ["3commitのhash", "diffの説明", "GitHub URLまたはスクリーンショット"],
+                ["3commitに分かれている", "差分の理由を説明している"],
+            ),
+            (
+                f"{phase}：制限時間課題",
+                "60分でCまたはシェルの小課題を1題解き、提出可能な形にする。",
+                ["開始/終了時刻", "提出物", "できた点", "できなかった点"],
+                ["60分の時間管理がある", "提出物が確認できる", "改善点がある"],
+            ),
+            (
+                f"{phase}：説明・ピアレビュー準備",
+                "今日のコードを人に説明する前提で、処理の流れと詰まりを整理する。",
+                ["処理の流れ", "変数の変化", "詰まった点", "質問1つ"],
+                ["処理の流れを第三者が追える", "質問が具体的である"],
+            ),
+            (
+                f"{phase}：総合演習",
+                "ターミナル操作、Git、C実装を1セットで行う。",
+                ["ターミナル操作ログ", "Git commit", "Cコード", "実行結果"],
+                ["1セット完了している", "コードと実行結果が確認できる"],
+            ),
+            (
+                f"週次確認：{phase}耐性チェック",
+                "1週間のコード量、成功数、失敗原因、生活負荷を確認する。",
+                ["今週の演習数", "コンパイル成功数", "失敗原因トップ3", "翌週重点3つ"],
+                ["数値で振り返れている", "翌週重点が具体的である"],
+            ),
+        ]
+        title, description, deliverables, criteria = plans[weekday]
+        return title, description, "assignment" if weekday < 6 else "review", deliverables, criteria, [
+            "screenshot",
+            "text",
+            "github_url",
+            "file",
+        ]
+    return (
+        "日次学習・成果物提出",
+        "その日の最優先課題に取り組み、成果物または実施証跡を残す。",
+        "assignment",
+        ["実施証跡", "未完了理由", "次の行動"],
+        ["次にやることが日単位で決まっている"],
+        ["screenshot", "photo", "text", "file", "github_url"],
+    )
 
 
 def _seed_empty_day_markers(session: Session, learner_id: uuid.UUID) -> int:
@@ -309,6 +562,7 @@ def _seed_empty_day_markers(session: Session, learner_id: uuid.UUID) -> int:
                 FROM schedule_items
                 WHERE learner_id = :learner_id
                   AND scheduled_date BETWEEN :start_date AND :end_date
+                  AND schedule_key NOT LIKE 'taiga-%-daily-marker'
                 """
             ),
             {"learner_id": learner_id, "start_date": SCHEDULE_START, "end_date": SCHEDULE_END},
@@ -318,26 +572,22 @@ def _seed_empty_day_markers(session: Session, learner_id: uuid.UUID) -> int:
     day = SCHEDULE_START
     while day <= SCHEDULE_END:
         if day not in existing_dates:
-            is_sunday = day.weekday() == 6
+            title, description, item_type, deliverables, criteria, evidence = _daily_marker_plan(day)
             _upsert_item(
                 session,
                 key=f"taiga-{day.isoformat()}-daily-marker",
                 learner_id=learner_id,
                 scheduled_date=day,
-                title="週次レビュー・未完了回収" if is_sunday else "日次学習・成果物提出",
-                description=(
-                    "未提出、修正依頼、翌週改善をShomaと確認する。"
-                    if is_sunday
-                    else "その日の最優先課題に取り組み、成果物または実施証跡を残す。"
-                ),
-                item_type="review" if is_sunday else "assignment",
+                title=title,
+                description=description,
+                item_type=item_type,
                 priority=80,
-                due_at=_due_at(day, "23:59") if not is_sunday else _due_at(day, "20:00"),
+                due_at=_due_at(day, "20:00") if item_type == "review" else _due_at(day, "23:59"),
                 metadata={
-                    "objective": "データなしの日を作らず、未完了を隠さない",
-                    "deliverables": ["実施証跡", "未完了理由", "次の行動"],
-                    "acceptanceCriteria": ["次にやることが日単位で決まっている"],
-                    "allowedEvidenceTypes": ["screenshot", "photo", "text", "file", "github_url"],
+                    "objective": description,
+                    "deliverables": deliverables,
+                    "acceptanceCriteria": criteria,
+                    "allowedEvidenceTypes": evidence,
                     "nextAction": "未完了があれば今日の最優先として回収する",
                 },
             )
@@ -356,6 +606,17 @@ def seed_schedule_items(
         {"learner_email": learner_email},
     ).scalar_one()
     count = 0
+    session.execute(
+        text(
+            """
+            DELETE FROM schedule_items
+            WHERE schedule_key IN (
+              'taiga-2026-09-07-42-web-test',
+              'taiga-2026-09-04-42-web-test-retry'
+            )
+            """
+        )
+    )
     count += _seed_fixed_items(session, learner_id)
     count += _seed_pre_pc_days(session, learner_id)
     count += _seed_curriculum_assignments(session, learner_id)
