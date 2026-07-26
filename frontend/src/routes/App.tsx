@@ -402,7 +402,7 @@ export function App() {
     return () => media.removeEventListener("change", updateNarrowViewport);
   }, []);
 
-  if (!isLocalEnvironment && me.isError) {
+  if (!isLocalEnvironment && !isSignedIn) {
     return (
       <main className="auth-screen" aria-labelledby="login-title">
         <section className="auth-panel">
