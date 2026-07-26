@@ -700,6 +700,11 @@ h2 {
   border-top: 1px solid var(--color-border);
 }
 
+.assignment-detail-grid > .alert,
+.assignment-history-panel {
+  grid-column: 1 / -1;
+}
+
 .assignment-panel {
   min-width: 0;
   display: grid;
@@ -711,6 +716,14 @@ h2 {
 .submission-form h2 {
   margin: 0;
   font-size: var(--font-size-lg);
+}
+
+.assignment-selector {
+  width: min(100%, 640px);
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-weight: 700;
 }
 
 .plain-list {
@@ -783,6 +796,45 @@ h2 {
 
 .attachment-link-list {
   gap: var(--space-1);
+}
+
+.submission-history-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.submission-history-item {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-tinted);
+}
+
+.submission-history-heading {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.submission-history-heading time,
+.review-result-box time,
+.evidence-note {
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
+
+.review-result-box {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid rgba(53, 107, 87, 0.24);
+  border-radius: var(--radius-sm);
+  background: var(--color-success-bg);
 }
 
 .fatal-shell {

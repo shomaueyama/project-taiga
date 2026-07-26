@@ -88,6 +88,28 @@ const assignmentArtifactSchema = z.object({
   kind: z.string(),
 });
 
+const submissionArtifactLinkSchema = z.object({
+  id: z.string(),
+  originalName: z.string(),
+  mediaType: z.string(),
+  sizeBytes: z.number(),
+});
+
+const submissionSnapshotSchema = z.object({
+  id: z.string(),
+  version: z.number(),
+  status: z.string(),
+  createdAt: z.string(),
+  repositoryUrl: z.string().nullable().optional(),
+  commitHash: z.string().nullable().optional(),
+  submissionNote: z.string().nullable().optional(),
+  artifactNames: z.array(z.string()).optional(),
+  artifactLinks: z.array(submissionArtifactLinkSchema).optional(),
+  reviewResult: z.string().nullable().optional(),
+  reviewComment: z.string().nullable().optional(),
+  reviewedAt: z.string().nullable().optional(),
+});
+
 const assignmentDetailSchema = z.object({
   assignment: assignmentSummarySchema,
   goal: z.string().nullable().optional(),
@@ -97,7 +119,7 @@ const assignmentDetailSchema = z.object({
   requiredArtifacts: z.array(assignmentArtifactSchema).optional(),
   submissionGuide: z.array(z.string()).optional(),
   submissionSpec: z.record(z.string(), z.unknown()),
-  submissions: z.array(z.unknown()),
+  submissions: z.array(submissionSnapshotSchema),
 });
 
 const scheduleItemSchema = z.object({
@@ -169,14 +191,7 @@ const submissionSchema = z.object({
   commitHash: z.string().nullable().optional(),
   submissionNote: z.string().nullable().optional(),
   artifactNames: z.array(z.string()).optional(),
-  artifactLinks: z.array(
-    z.object({
-      id: z.string(),
-      originalName: z.string(),
-      mediaType: z.string(),
-      sizeBytes: z.number(),
-    }),
-  ).optional(),
+  artifactLinks: z.array(submissionArtifactLinkSchema).optional(),
 });
 
 const reviewQueueSchema = z.object({
@@ -271,7 +286,7 @@ export type AssignmentDetail = {
   requiredArtifacts: AssignmentArtifact[];
   submissionGuide: string[];
   submissionSpec: Record<string, unknown>;
-  submissions: unknown[];
+  submissions: z.infer<typeof submissionSnapshotSchema>[];
 };
 export type ScheduleItem = z.infer<typeof scheduleItemSchema>;
 export type ScheduleDay = z.infer<typeof scheduleDaySchema>;

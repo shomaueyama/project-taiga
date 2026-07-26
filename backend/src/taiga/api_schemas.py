@@ -34,6 +34,14 @@ class SubmissionSnapshot(BaseModel):
     version: int
     status: str
     createdAt: str
+    repositoryUrl: str | None = None
+    commitHash: str | None = None
+    submissionNote: str | None = None
+    artifactNames: list[str] = Field(default_factory=list)
+    artifactLinks: list[dict[str, Any]] = Field(default_factory=list)
+    reviewResult: str | None = None
+    reviewComment: str | None = None
+    reviewedAt: str | None = None
     model_config = ConfigDict(extra="allow")
 
 

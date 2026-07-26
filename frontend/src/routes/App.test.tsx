@@ -247,7 +247,29 @@ function installFetch(
         requiredArtifacts: [{ path: "answer.md", kind: "file" }],
         submissionGuide: ["教材を開く。", "回答メモを書いて提出する。"],
         submissionSpec: {},
-        submissions: [],
+        submissions: [
+          {
+            id: submissionId,
+            version: 1,
+            status: "approved",
+            createdAt: now,
+            repositoryUrl: "https://github.com/shomaueyama/project-taiga",
+            commitHash: "abc123",
+            submissionNote: "タイピング練習を完了しました。",
+            artifactNames: ["answer.md", "typing-result.png"],
+            artifactLinks: [
+              {
+                id: reviewId,
+                originalName: "typing-result.png",
+                mediaType: "image/png",
+                sizeBytes: 1234,
+              },
+            ],
+            reviewResult: "approved",
+            reviewComment: "提出内容を確認しました。",
+            reviewedAt: now,
+          },
+        ],
       });
     }
     if (path === `/api/v1/assignments/${assignmentId}/submissions`) {
@@ -418,8 +440,13 @@ describe("App", () => {
     renderApp(["/assignments"]);
 
     expect(await screen.findByText("Typing basics")).toBeInTheDocument();
+    expect(screen.getByLabelText("提出する課題")).toHaveValue(assignmentId);
     expect(screen.queryByRole("button", { name: "デモ回答を提出" })).not.toBeInTheDocument();
     expect(screen.queryByText("新しい提出はまだありません。")).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "提出履歴" })).toBeInTheDocument();
+    expect(screen.getByText("v1")).toBeInTheDocument();
+    expect(screen.getByText("レビュー: 承認済み")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "typing-result.png" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "ログアウト" })).toBeInTheDocument();
   });
 
@@ -431,6 +458,7 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText("回答メモ"), {
       target: { value: "タイピング練習を完了しました。" },
     });
+    expect(screen.getByLabelText("写真ライブラリ・ファイル添付（任意）")).not.toHaveAttribute("capture");
     fireEvent.click(screen.getByRole("button", { name: "提出する" }));
 
     expect(await screen.findByText(`提出しました。レビュー待ちです: ${submissionId.slice(0, 8)}`)).toBeInTheDocument();
@@ -478,8 +506,7 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "ナビゲーションを開く" }));
     fireEvent.click(screen.getByRole("link", { name: "課題" }));
-    fireEvent.click(await screen.findByRole("button", { name: "詳細を開く" }));
-    expect(screen.getByLabelText("課題詳細")).toHaveTextContent("Typing basics");
+    expect(await screen.findByLabelText("課題詳細")).toHaveTextContent("Typing basics");
   });
 
   it("shows the schedule calendar and opens linked assignments", async () => {
@@ -490,6 +517,7 @@ describe("App", () => {
     expect(await screen.findAllByText("基本情報：現在地確認")).not.toHaveLength(0);
     expect(screen.getByLabelText("カレンダー凡例")).toHaveTextContent("重要日");
     expect(await screen.findAllByText("遅延")).not.toHaveLength(0);
+    expect(screen.getByText("根拠URL未設定")).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "課題詳細へ" }));
     expect(await screen.findByRole("heading", { name: "課題" })).toBeInTheDocument();
   });

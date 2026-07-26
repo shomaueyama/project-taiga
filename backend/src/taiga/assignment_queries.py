@@ -101,10 +101,44 @@ def get_assignment(session: Session, principal: Principal, assignment_id: UUID) 
         session.execute(
             text(
                 """
-                SELECT id, submission_version, status::text, created_at
-                FROM submissions
-                WHERE assignment_id = :assignment_id AND learner_id = :learner_id
-                ORDER BY submission_version DESC
+                SELECT s.id, s.submission_version, s.status::text, s.created_at,
+                       s.repository_url, s.commit_hash, s.artifact_manifest_json,
+                       r.result::text AS review_result, r.comment AS review_comment,
+                       r.created_at AS reviewed_at,
+                       COALESCE(
+                           (
+                               SELECT array_agg(sa.original_name ORDER BY sa.original_name)
+                               FROM submission_artifacts sa
+                               WHERE sa.submission_id = s.id
+                           ),
+                           ARRAY[]::text[]
+                       ) AS artifact_names,
+                       COALESCE(
+                           (
+                               SELECT jsonb_agg(
+                                   jsonb_build_object(
+                                       'id', sa.id,
+                                       'originalName', sa.original_name,
+                                       'mediaType', sa.media_type,
+                                       'sizeBytes', sa.size_bytes
+                                   )
+                                   ORDER BY sa.original_name
+                               )
+                               FROM submission_artifacts sa
+                               WHERE sa.submission_id = s.id
+                           ),
+                           '[]'::jsonb
+                       ) AS artifact_links
+                FROM submissions s
+                LEFT JOIN LATERAL (
+                    SELECT result, comment, created_at
+                    FROM reviews
+                    WHERE submission_id = s.id
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                ) r ON true
+                WHERE s.assignment_id = :assignment_id AND s.learner_id = :learner_id
+                ORDER BY s.submission_version DESC
                 """
             ),
             {"assignment_id": assignment_id, "learner_id": learner_id},
@@ -145,6 +179,14 @@ def get_assignment(session: Session, principal: Principal, assignment_id: UUID) 
                 version=item["submission_version"],
                 status=item["status"],
                 createdAt=item["created_at"].isoformat(),
+                repositoryUrl=item["repository_url"],
+                commitHash=item["commit_hash"],
+                submissionNote=(item["artifact_manifest_json"] or {}).get("submissionNote"),
+                artifactNames=[str(name) for name in item["artifact_names"]],
+                artifactLinks=list(item["artifact_links"] or []),
+                reviewResult=item["review_result"],
+                reviewComment=item["review_comment"],
+                reviewedAt=item["reviewed_at"].isoformat() if item["reviewed_at"] else None,
             )
             for item in submissions
         ],

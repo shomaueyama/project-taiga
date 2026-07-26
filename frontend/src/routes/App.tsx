@@ -760,29 +760,25 @@ export function App() {
               <PageHeader
                 eyebrow="MISSION TASKS"
                 title="課題"
-                description="取り組む課題と提出状況を確認できます。"
+                description="提出する課題を選び、内容・提出物・履歴を確認できます。"
                 titleId="assignments-title"
               />
               {assignments.isLoading ? <LoadingState label="課題を読み込み中です" /> : null}
-              <div className="assignment-list">
-                {(assignments.data?.items ?? []).slice(0, 8).map((assignment) => (
-                  <article className="assignment-row" key={assignment.id}>
-                    <div>
-                      <strong>{assignment.title}</strong>
-                      <span>{assignment.stableCode}</span>
-                    </div>
-                    <div className="row-actions">
-                      <time dateTime={assignment.scheduledDate}>
-                        {formatDate(assignment.scheduledDate)}
-                      </time>
-                      <StatusBadge status={assignment.status} />
-                      <button type="button" onClick={() => openAssignment(assignment.id)}>
-                        詳細を開く
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
+              {(assignments.data?.items ?? []).length > 0 ? (
+                <label className="assignment-selector">
+                  提出する課題
+                  <select
+                    value={selectedAssignment ?? ""}
+                    onChange={(event) => openAssignment(event.target.value)}
+                  >
+                    {(assignments.data?.items ?? []).map((assignment) => (
+                      <option key={assignment.id} value={assignment.id}>
+                        {assignment.title} / {assignment.stableCode}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               {assignments.data?.items.length === 0 ? (
                 <EmptyState title="表示できる課題はありません。" />
               ) : null}
@@ -799,6 +795,9 @@ export function App() {
                 ) : null}
                 {assignmentDetail.data ? (
                   <div className="assignment-detail-grid">
+                    <Alert tone="info">
+                      課題内容は公開教材とカリキュラム定義に基づきます。外部根拠がある予定はスケジュール詳細の根拠URLに表示します。
+                    </Alert>
                     <section className="assignment-panel" aria-labelledby="assignment-steps-title">
                       <h2 id="assignment-steps-title">やること</h2>
                       <ol className="plain-list">
@@ -856,7 +855,56 @@ export function App() {
                           <li key={item}>{item}</li>
                         ))}
                       </ul>
-                      <p>提出履歴: {assignmentDetail.data.submissions.length}件</p>
+                    </section>
+                    <section className="assignment-panel assignment-history-panel" aria-labelledby="assignment-history-title">
+                      <h2 id="assignment-history-title">提出履歴</h2>
+                      {assignmentDetail.data.submissions.length > 0 ? (
+                        <div className="submission-history-list">
+                          {assignmentDetail.data.submissions.map((submission) => (
+                            <article className="submission-history-item" key={submission.id}>
+                              <div className="submission-history-heading">
+                                <strong>v{submission.version}</strong>
+                                <StatusBadge status={submission.status} />
+                                <time dateTime={submission.createdAt}>{formatDate(submission.createdAt)}</time>
+                              </div>
+                              {submission.repositoryUrl ? (
+                                <a href={submission.repositoryUrl} target="_blank" rel="noreferrer">
+                                  GitHub URLを開く
+                                </a>
+                              ) : null}
+                              {submission.commitHash ? <p>Commit: {submission.commitHash}</p> : null}
+                              {submission.submissionNote ? (
+                                <p className="submission-note-preview">{submission.submissionNote}</p>
+                              ) : null}
+                              {(submission.artifactLinks ?? []).length > 0 ? (
+                                <div className="attachment-link-list" aria-label="提出添付">
+                                  {(submission.artifactLinks ?? []).map((artifact) => (
+                                    <a
+                                      key={artifact.id}
+                                      href={`/api/v1/submission-artifacts/${artifact.id}/content`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      {artifact.originalName}
+                                    </a>
+                                  ))}
+                                </div>
+                              ) : null}
+                              {submission.reviewResult ? (
+                                <div className="review-result-box">
+                                  <strong>レビュー: {labelForStatus(submission.reviewResult)}</strong>
+                                  {submission.reviewComment ? <p>{submission.reviewComment}</p> : null}
+                                  {submission.reviewedAt ? (
+                                    <time dateTime={submission.reviewedAt}>{formatDate(submission.reviewedAt)}</time>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </article>
+                          ))}
+                        </div>
+                      ) : (
+                        <p>提出はまだありません。</p>
+                      )}
                     </section>
                   </div>
                 ) : null}
@@ -909,11 +957,10 @@ export function App() {
                     />
                   </label>
                   <label>
-                    写真・ファイル添付（任意）
+                    写真ライブラリ・ファイル添付（任意）
                     <input
                       type="file"
                       accept="image/*,.md,.txt,.zip"
-                      capture="environment"
                       multiple
                       onChange={(event) =>
                         setAssignmentForm((current) => ({
@@ -1386,7 +1433,9 @@ function ScheduleDayDetail({
                   <a className="button-link secondary" href={item.sourceUrl} target="_blank" rel="noreferrer">
                     根拠URL
                   </a>
-                ) : null}
+                ) : (
+                  <span className="evidence-note">根拠URL未設定</span>
+                )}
                 {canAdmin ? (
                   <>
                     <button type="button" onClick={() => onEditItem(item)}>
