@@ -456,30 +456,28 @@ export function App() {
       </aside>
 
       <div className="main-shell">
-        <header className="app-header">
-          <div>
-            <p className="eyebrow">TAIGA NOVA</p>
-            <p className="topbar-title">{routeTitle(location.pathname)}</p>
-          </div>
-          <dl className="status-grid" aria-label="サービス状態">
+        {isLocalEnvironment ? (
+          <header className="app-header">
             <div>
-              <dt>API</dt>
-              <dd>{health.isSuccess ? labelForStatus(health.data.status) : "確認中"}</dd>
+              <p className="eyebrow">TAIGA NOVA</p>
+              <p className="topbar-title">{routeTitle(location.pathname)}</p>
             </div>
-            {isLocalEnvironment ? (
-              <>
-                <div>
-                  <dt>実行環境</dt>
-                  <dd>{health.data?.runner_enabled ? "有効" : "停止中"}</dd>
-                </div>
-                <div>
-                  <dt>試験</dt>
-                  <dd>{health.data?.exam_enabled ? "有効" : "停止中"}</dd>
-                </div>
-              </>
-            ) : null}
-          </dl>
-        </header>
+            <dl className="status-grid" aria-label="サービス状態">
+              <div>
+                <dt>API</dt>
+                <dd>{health.isSuccess ? labelForStatus(health.data.status) : "確認中"}</dd>
+              </div>
+              <div>
+                <dt>実行環境</dt>
+                <dd>{health.data?.runner_enabled ? "有効" : "停止中"}</dd>
+              </div>
+              <div>
+                <dt>試験</dt>
+                <dd>{health.data?.exam_enabled ? "有効" : "停止中"}</dd>
+              </div>
+            </dl>
+          </header>
+        ) : null}
 
         <main id="main-content" className="main-content" tabIndex={-1}>
           {health.isPending ? (
