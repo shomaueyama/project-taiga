@@ -1,73 +1,127 @@
-# Production Launch Plan
+# 本番公開メモ
 
-Status: plan only. External launch steps require explicit owner approval at each gate.
+Status: `taiganova.app` の初回本番デプロイは完了済み。
 
-## Architecture
+## 現在の構成
 
 ```text
-Cloudflare Access exact two-email policy
-  app.taiganova.app -> Cloudflare Pages -> React/Vite
-  api.taiganova.app -> Cloudflare proxied DNS -> Render Free FastAPI -> Neon Free PostgreSQL
+Cloudflare Access
+  app.taiganova.app
+    -> Cloudflare Pages taiga-nova-web
+    -> React/Vite static assets
+    -> /api/* は Pages Function で Render raw URL へ proxy
+
+Render Free
+  taiga-nova-api
+  https://taiga-nova-api.onrender.com
+  FastAPI / uvicorn
+
+Neon Free
+  taiga-nova-production
+  PostgreSQL
+
+api.taiganova.app
+  -> Render custom domain
+  -> health/direct 確認用
 ```
 
-Runner execution remains disabled with `RUNNER_ENABLED=false`.
+本番アプリ内の API base URL は `https://app.taiganova.app` です。`/api/*` を Pages Function が Render に転送します。これは、Render の `onrender.com` を Cloudflare proxied CNAME にすると Cloudflare 側で `DNS points to prohibited IP` になったためです。
 
-## Deployment Order
+## 本番 URL
 
-1. Gate 1: purchase or configure `taiganova.app` only after price/renewal approval.
-2. Gate 2: publish the approved branch and create a PR.
-3. Gate 3: create Neon Free project `taiga-nova-production`.
-4. Gate 4: run Alembic migrations against the approved direct Neon connection.
-5. Gate 5: create Render Free service `taiga-nova-api` using `render.yaml`.
-6. Gate 6: create Cloudflare Pages project `taiga-nova-web`, DNS records, custom domains, and
-   Cloudflare Access applications.
-7. Gate 7: run the first-user bootstrap command with owner-approved JSON.
-8. Gate 8: complete smoke tests and request owner go-live acceptance.
+- アプリ: https://app.taiganova.app
+- API health: https://api.taiganova.app/api/health
+- Pages preview: `taiga-nova-web.pages.dev`
+- Render raw API: `https://taiga-nova-api.onrender.com`
 
-## Service Settings
+## 認証
 
-Render:
+Cloudflare Access を有効化済みです。
 
+- Team domain: `taiganova.cloudflareaccess.com`
+- Login method: One-time PIN
+- Access app: `taiga-nova-web` for `app.taiganova.app`
+- Access app: `taiga-nova-api` for `api.taiganova.app`
+
+許可 policy は次の 2 メールだけを Allow します。
+
+- `shomabirdie@icloud.com`
+- `taiga-albatross@softbank.ne.jp`
+
+Everyone、domain-wide、all valid emails、broad Bypass は使いません。
+
+## Render 設定
+
+- Service: `taiga-nova-api`
+- Runtime: Python
 - Root directory: `backend`
 - Build command: `pip install -e ".[dev]"`
 - Start command: `uvicorn taiga.main:app --host 0.0.0.0 --port $PORT`
 - Health check: `/api/health`
 
-Cloudflare Pages:
+重要な環境変数:
 
-- Root directory: `frontend`
-- Build command: `npm install && npm run build`
-- Output directory: `dist`
-- Production API URL: `https://api.taiganova.app`
+```text
+APP_ENV=production
+LOCAL_AUTH_ENABLED=false
+RUNNER_ENABLED=false
+EXAM_ENABLED=false
+RATE_LIMIT_ENABLED=true
+FRONTEND_ORIGINS=https://app.taiganova.app
+CLOUDFLARE_ACCESS_TEAM_DOMAIN=https://taiganova.cloudflareaccess.com
+AUTHORIZED_USER_EMAILS=shomabirdie@icloud.com,taiga-albatross@softbank.ne.jp
+```
 
-Neon:
+`CLOUDFLARE_ACCESS_AUD` は `taiga-nova-web` の Access audience を使います。アプリ内 API は `app.taiganova.app/api/*` 経由で呼ばれ、Cloudflare Access の JWT audience も web app のものになるためです。
+
+## Neon 設定
 
 - Project: `taiga-nova-production`
-- Plan: Free, unless owner explicitly approves otherwise.
-- Runtime URL: pooled connection when compatible.
-- Migration URL: direct connection.
+- Database: `taiga`
+- Migration: Alembic `head` 適用済み
+- 現在 revision: `0002_phase5_performance_indexes`
 
-## Access Policy
+接続文字列は `.env.neon.local` などの gitignored ファイルだけに保存します。コミットしません。
 
-Create separate Cloudflare Access applications:
+## 初期ユーザー
 
-- `taiga-nova-web` for `app.taiganova.app`
-- `taiga-nova-api` for `api.taiganova.app`
+本番 DB に bootstrap 済みです。
 
-Use an Allow policy that includes exactly:
+| メール | 表示名 | ロール | タイムゾーン |
+|---|---|---|---|
+| `shomabirdie@icloud.com` | Shoma | admin | Asia/Tokyo |
+| `taiga-albatross@softbank.ne.jp` | Taiga | learner | Asia/Tokyo |
 
-- `shomabirdie@icloud.com`
-- `taiga-albatross@softbank.ne.jp`
+## Smoke 結果
 
-Do not use Everyone, all valid emails, domain-wide selectors, or broad Bypass policies.
+確認済み:
 
-## Smoke Test Summary
+- `https://app.taiganova.app` は未認証で Cloudflare Access login に redirect
+- `https://app.taiganova.app/api/health` は未認証で Cloudflare Access login に redirect
+- `https://api.taiganova.app/api/health` は 200
+- `https://api.taiganova.app/api/v1/me` は Access JWT なしで 401
+- `Origin: https://app.taiganova.app` の CORS は許可
+- Render deploy は `live`
 
-- `GET https://api.taiganova.app/api/health` returns minimal 2xx.
-- Unauthenticated frontend access shows Cloudflare Access before app content.
-- Unauthenticated protected API access returns 401/403.
-- Approved admin maps to Shoma/admin.
-- Approved learner maps to Taiga/learner.
-- Unauthorized emails are denied.
-- CORS allows only `https://app.taiganova.app`.
-- Runner remains disabled.
+ブラウザで確認済み:
+
+- Cloudflare Access の One-time PIN ログイン画面が表示される
+- 許可済みメールでログインできる
+
+## 本番制限
+
+- Render Free の cold start は許容する。
+- Render の local filesystem upload は永続ストレージではない。
+- `RUNNER_ENABLED=false` のままにする。
+- `EXAM_ENABLED=false` のままにする。
+- runner 実行、durable upload、backup 自動化は将来対応。
+
+## Rollback
+
+短期 rollback:
+
+1. Cloudflare Pages の直前 deployment に戻す。
+2. Render の直前 deployment に戻す。
+3. 必要なら Cloudflare Access app/policy を無効化せず、許可メールだけ確認する。
+
+DB migration rollback は現在想定しません。Neon Free の backup/restore 制限があるため、production data rollback は事前の手動 export または Neon 側の復元機能確認が必要です。

@@ -1,22 +1,36 @@
 # Project Taiga
 
-Local-first learning platform MVP for Project Taiga.
+Project Taiga は、TAIGA NOVA の学習プラットフォーム MVP です。
 
-This repository is implemented from the Project Taiga v4.0 Implementation Pack in:
+このリポジトリは、次の設計パックを読み取り専用の正本として実装しています。
 
 ```text
 ../design/taiga-42-v4.0-implementation-pack
 ```
 
-The design pack is read-only. Application code, tests, migrations, and local documentation live in this repository.
+設計パックは変更しません。アプリケーションコード、テスト、migration、ローカル用ドキュメントはこのリポジトリに置きます。
 
-## Local Targets
+## 本番環境
 
-- Frontend: http://localhost:5173
+- アプリ: https://app.taiganova.app
+- API health: https://api.taiganova.app/api/health
+- フロントエンド: Cloudflare Pages
+- API: Render Free Web Service
+- DB: Neon Free PostgreSQL
+- 認証: Cloudflare Access + One-time PIN
+- 許可ユーザー:
+  - `shomabirdie@icloud.com` / admin
+  - `taiga-albatross@softbank.ne.jp` / learner
+
+本番のアプリ内 API 通信は `https://app.taiganova.app/api/*` から Cloudflare Pages Function 経由で Render に転送します。`api.taiganova.app` は health/direct 確認用のカスタムドメインです。
+
+## ローカル URL
+
+- フロントエンド: http://localhost:5173
 - API: http://localhost:8000
 - API docs: http://localhost:8000/docs
 
-## Local Routes
+## ローカル画面
 
 - `/dashboard`
 - `/assignments`
@@ -26,14 +40,14 @@ The design pack is read-only. Application code, tests, migrations, and local doc
 - `/exams`
 - `/admin`
 
-## Prerequisites
+## 前提ツール
 
-- Docker and Docker Compose
-- Node.js/npm for local frontend tests
-- Python virtual environment at `.venv` for local backend commands
-- Read-only design pack at `../design/taiga-42-v4.0-implementation-pack`
+- Docker / Docker Compose
+- Node.js / npm
+- Python 仮想環境 `.venv`
+- 読み取り専用の設計パック `../design/taiga-42-v4.0-implementation-pack`
 
-## Core Commands
+## よく使うコマンド
 
 ```bash
 make setup
@@ -50,7 +64,7 @@ python3 scripts/perf_load.py --scenario baseline
 make down
 ```
 
-## Clean Local Setup
+## クリーンなローカル起動
 
 ```bash
 make setup
@@ -63,12 +77,11 @@ make seed
 docker compose ps
 ```
 
-The second `make seed` verifies idempotency. The backend and worker use the same backend
-Dockerfile. The canonical curriculum is mounted read-only from the design pack.
+2 回目の `make seed` は seed の冪等性確認です。backend と worker は同じ backend Dockerfile を使います。正本 curriculum は設計パックから読み取り専用でマウントします。
 
-## Local Data
+## ローカルデータ
 
-Run migration and seed after starting PostgreSQL:
+PostgreSQL 起動後に migration と seed を実行します。
 
 ```bash
 docker compose up -d --build
@@ -77,18 +90,14 @@ make seed
 make seed
 ```
 
-The seed is idempotent and local-only. It imports the canonical curriculum from the read-only
-implementation pack and adds realistic Local MVP fixtures for:
+seed は local 専用で、設計パックの canonical curriculum を取り込みます。あわせて、Local MVP 用の現実的な fixture を追加します。
 
-- Admin: `admin@example.local` / 上山 捷馬
-- Learner: `taiga@example.local` / 上山 虎雅
-- Reviewer compatibility user: `reviewer@example.local`
-- Assignment states, immutable submissions, review comments, runner job states, exam attempt states,
-  rank, and capability progress
+- 管理者: `admin@example.local` / 上山 捷馬
+- 学習者: `taiga@example.local` / 上山 虎雅
+- レビュー互換ユーザー: `reviewer@example.local`
+- 課題状態、immutable submission、review comment、runner job 状態、exam attempt 状態、rank、capability progress
 
-The design curriculum is mounted read-only into Docker at `/workspace/curriculum`.
-
-To reset local data:
+ローカルデータを消す場合:
 
 ```bash
 make reset
@@ -97,7 +106,7 @@ make migrate
 make seed
 ```
 
-## Testing
+## テスト
 
 ```bash
 make lint
@@ -110,45 +119,34 @@ cd frontend && npx playwright test --repeat-each=3
 cd frontend && npx playwright test --retries=2
 ```
 
-The current Local MVP test matrix is documented in
-`docs/local-mvp-test-matrix.md`. Playwright monitors `pageerror`, `console.error`, failed requests,
-and unexpected HTTP 5xx responses.
+現在の Local MVP テスト範囲は `docs/local-mvp-test-matrix.md` に記録しています。Playwright は `pageerror`、`console.error`、失敗 request、想定外の HTTP 5xx を監視します。
 
-## Baseline Planning
+## 本番デプロイ
 
-Phase 0 baseline and planning records are in `docs/phase-0/README.md`.
-Phase 1 local MVP completion records are in `docs/phase-1/README.md`.
-Phase 2 coverage/reliability records are in `docs/phase-2/`.
-Phase 3 domain and architecture refactoring records are in `docs/phase-3/`.
-Phase 4 security hardening records are in `docs/phase-4/`.
-Phase 5 performance and scalability records are in `docs/phase-5/`.
-Phase 6 UX, Japanese localization, accessibility, and responsive records are in `docs/phase-6/`.
-Phase 6.5 TAIGA NOVA visual language records are in `docs/phase-6-5/`.
-Phase 6.75 visual QA and layout stabilization records are in `docs/phase-6-75/`.
-Phase 7 production infrastructure records are in `docs/phase-7/` and `infra/`.
-Phase 7.1 Cloudflare-native assessment records are in `docs/phase-7-cloudflare/`.
-Phase 7.2 free two-user deployment records are in `docs/phase-7-2/` and
-`docs/deployment/cloudflare-render-neon.md`.
-Phase 7.3 production Cloudflare Access controls are in `docs/phase-7-3/` and
-`docs/security/cloudflare-access.md`.
-Phase 7.4 gated production launch planning for `taiganova.app` is in `docs/phase-7-4/` and
-`docs/deployment/production-launch.md`.
+本番は Cloudflare Pages、Render Free、Neon Free、Cloudflare Access の 2 ユーザー構成です。
 
-## Production Infrastructure
+- Cloudflare Pages project: `taiga-nova-web`
+- Render service: `taiga-nova-api`
+- Neon project: `taiga-nova-production`
+- Cloudflare Access team domain: `taiganova.cloudflareaccess.com`
+- Login method: One-time PIN
 
-Phase 7 Terraform lives under `infra/` with staging and production roots. Validate without creating
-AWS resources:
+Render の重要な安全設定:
 
-```bash
-make terraform-validate
+```text
+APP_ENV=production
+LOCAL_AUTH_ENABLED=false
+RUNNER_ENABLED=false
+EXAM_ENABLED=false
+RATE_LIMIT_ENABLED=true
+FRONTEND_ORIGINS=https://app.taiganova.app
 ```
 
-Do not run `terraform apply` until AWS account ownership, remote state, GitHub OIDC, Route53, ACM,
-and rollout approval are confirmed. Production infrastructure keeps `RUNNER_ENABLED=false`.
+本番 DB migration は Neon の direct connection に対して Alembic を実行します。接続文字列は `.env.neon.local` などの gitignored ファイルにだけ保存し、コミットしません。
 
-## Feature Flags
+## 機能フラグ
 
-Local safety defaults keep code execution and exams disabled:
+ローカルと本番の安全デフォルト:
 
 ```text
 RUNNER_ENABLED=false
@@ -160,15 +158,9 @@ WORKER_IDLE_POLL_SECONDS=5
 WORKER_ERROR_RETRY_SECONDS=30
 ```
 
-The frontend renders disabled states safely and does not expose hidden tests or production
-credentials.
+`RUNNER_ENABLED=false` の間、runner queue request は安全に拒否され、学習者コードは実行されません。`EXAM_ENABLED=false` の間、exam mutation request は拒否され、フロントエンドも exam flow を開始しません。
 
-When `RUNNER_ENABLED=false`, backend runner queue requests are rejected safely and no learner code is
-executed. When `EXAM_ENABLED=false`, exam mutation requests are rejected safely and the frontend does
-not start the exam flow. Rate limiting is local and in-process; production must replace it with a
-distributed control.
-
-## Local Safety Defaults
+## ローカル安全設定
 
 - `APP_ENV=local`
 - `LOCAL_AUTH_ENABLED=true`
@@ -176,29 +168,23 @@ distributed control.
 - `EXAM_ENABLED=false`
 - `RATE_LIMIT_ENABLED=true`
 
-AWS deployment and production connections are out of scope for the Local MVP.
+LocalAuth は `APP_ENV=local` かつ `LOCAL_AUTH_ENABLED=true` のときだけ有効です。本番では必ず無効にします。
 
-The approved Phase 7.4 production topology uses Cloudflare Pages, Render Free, Neon Free, and
-Cloudflare Access for exactly two users. Production launch remains gated: do not purchase domains,
-create external resources, push branches, run production migrations, or deploy until the owner
-approves the corresponding Phase 7.4 stop gate.
+## ドキュメント
 
-Local security hardening also includes explicit CORS methods and headers, response security headers,
-strict request schema validation, generated upload storage keys, Docker socket removal from worker
-services, and runner-controller container hardening. See `docs/phase-4/` for the threat model,
-attack surface inventory, test matrix, and deferred risks.
+- Phase 0: `docs/phase-0/`
+- Phase 1: `docs/phase-1/`
+- Phase 2: `docs/phase-2/`
+- Phase 3: `docs/phase-3/`
+- Phase 4: `docs/phase-4/`
+- Phase 5: `docs/phase-5/`
+- Phase 6: `docs/phase-6/`
+- Phase 6.5: `docs/phase-6-5/`
+- Phase 6.75: `docs/phase-6-75/`
+- Phase 7 AWS 将来構成: `docs/phase-7/` と `infra/`
+- Cloudflare/Render/Neon 本番構成: `docs/deployment/`
 
-Run the local read-path load test with:
-
-```bash
-python3 scripts/perf_load.py --scenario smoke
-python3 scripts/perf_load.py --scenario baseline
-python3 scripts/perf_load.py --scenario stress
-```
-
-The stress scenario is local-only and may intentionally hit API rate limits.
-
-## Logs and Troubleshooting
+## ログとトラブル対応
 
 ```bash
 docker compose ps
@@ -208,6 +194,4 @@ docker compose down
 docker compose up -d
 ```
 
-If migration or seed fails, confirm PostgreSQL is healthy and the design pack path exists. If
-LocalAuth fails, confirm `.env` contains `APP_ENV=local` and `LOCAL_AUTH_ENABLED=true`. LocalAuth is
-intentionally rejected outside the local environment.
+migration や seed が失敗する場合は、PostgreSQL が healthy か、設計パックのパスが存在するか確認してください。LocalAuth が失敗する場合は、`.env` の `APP_ENV=local` と `LOCAL_AUTH_ENABLED=true` を確認してください。

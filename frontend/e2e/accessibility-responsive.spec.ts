@@ -96,7 +96,7 @@ test("dashboard initial load does not issue duplicate API requests", async ({ pa
   await expect(page.getByText("上山 虎雅 · 学習者")).toBeVisible();
   await page.waitForLoadState("networkidle");
 
-  expect(counts.get("/health")).toBe(1);
+  expect(counts.get("/api/health")).toBe(1);
   expect(counts.get("/api/v1/me")).toBe(1);
   expect(counts.get("/api/v1/dashboard")).toBe(1);
   expect(counts.get("/api/v1/assignments")).toBe(1);

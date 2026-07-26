@@ -1,28 +1,69 @@
-# Cloudflare Pages Deployment
+# Cloudflare Pages デプロイ
 
-Status: plan only. No Cloudflare Pages project, custom domain, or Access policy was created.
+Status: Pages project `taiga-nova-web` は作成済み。`app.taiganova.app` は active。
 
-## Build Settings
+## Build 設定
 
 - Root directory: `frontend`
 - Build command: `npm install && npm run build`
 - Output directory: `dist`
-- Production environment variable: `VITE_API_BASE_URL=https://api.<domain>`
+- Production environment variable: `VITE_API_BASE_URL=https://app.taiganova.app`
 
-The Vite production build fails if `VITE_API_BASE_URL` is missing or not HTTPS.
+Vite production build は `VITE_API_BASE_URL` が未設定、または HTTPS でない場合に失敗する。
 
 ## Routing
 
-`frontend/public/_redirects` provides the SPA fallback for direct route loads.
+`frontend/public/_redirects` が SPA fallback を提供する。直接 `/dashboard` などにアクセスしても React app に戻る。
 
-## Access Requirement
+## Pages Function proxy
 
-Before first production deployment, protect `app.<domain>` with Cloudflare Access:
+`frontend/functions/api/[[path]].ts` が `/api/*` を Render raw URL に proxy する。
 
-- Include only the two owner-approved email addresses.
-- Do not use broad domain-based or Everyone rules.
-- Keep the repository private and avoid exposing frontend config beyond the API origin.
+```text
+https://app.taiganova.app/api/* -> https://taiga-nova-api.onrender.com/api/*
+```
 
-Official reference:
+この proxy が Cloudflare Access JWT header を Render に転送するため、本番アプリ内 API 通信は `app.taiganova.app` の same-origin で行う。
+
+## Deploy
+
+```bash
+cd frontend
+VITE_API_BASE_URL=https://app.taiganova.app npm run build
+npx wrangler pages deploy dist --project-name=taiga-nova-web --branch=main --commit-dirty=true
+```
+
+## Custom domain
+
+- `app.taiganova.app`
+- DNS: `app.taiganova.app CNAME taiga-nova-web.pages.dev` proxied
+- Cloudflare Access app: `taiga-nova-web`
+- Login method: One-time PIN
+
+## Access policy
+
+許可するメール:
+
+- `shomabirdie@icloud.com`
+- `taiga-albatross@softbank.ne.jp`
+
+Everyone、domain-wide、all valid emails、broad Bypass は使わない。
+
+## Smoke
+
+未認証で以下を確認する。
+
+```bash
+curl -i https://app.taiganova.app
+curl -i https://app.taiganova.app/api/health
+```
+
+期待:
+
+- Cloudflare Access login に redirect される。
+- Login method に One-time PIN が表示される。
+
+公式参照:
 
 - https://developers.cloudflare.com/pages/
+- https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/one-time-pin/

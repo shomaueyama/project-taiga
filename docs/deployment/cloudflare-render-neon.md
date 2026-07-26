@@ -1,172 +1,186 @@
-# Cloudflare + Render + Neon Deployment
+# Cloudflare + Render + Neon 本番構成
 
-Status: planning and configuration only. No external resources were created.
+Status: 初回デプロイ済み。外部サービスは Cloudflare Pages、Render Free、Neon Free を利用する。
 
-## Architecture
+## 構成
 
 ```text
 Cloudflare Pages
   React/Vite static assets
   HTTPS/CDN/custom domain
-  SPA fallback through frontend/public/_redirects
+  SPA fallback: frontend/public/_redirects
+  Pages Function: frontend/functions/api/[[path]].ts
 
 Render Free Web Service
-  FastAPI via uvicorn taiga.main:app --host 0.0.0.0 --port $PORT
+  FastAPI
+  uvicorn taiga.main:app --host 0.0.0.0 --port $PORT
   Health check: /api/health
-  PostgreSQL connection from DATABASE_URL
+  DATABASE_URL で Neon に接続
 
 Neon Free
-  PostgreSQL for SQLAlchemy and Alembic
+  PostgreSQL
+  Alembic migration 適用先
+
+Cloudflare Access
+  One-time PIN
+  2 メールだけ許可
 ```
 
-Runner remains disabled:
+runner は無効のままにする。
 
 ```text
 RUNNER_ENABLED=false
 ```
 
-AWS Terraform under `infra/` is preserved as a future paid/enterprise deployment path.
+AWS Terraform under `infra/` は、将来の有料または enterprise 構成として残す。
 
-## Repository Findings
+## 重要な実装判断
 
-| Area | Current state |
-|---|---|
-| Frontend | `frontend/`, React 19, TypeScript, Vite |
-| Vite config | `frontend/vite.config.ts` |
-| API base URL | `frontend/src/shared/api/client.ts`, `VITE_API_BASE_URL` |
-| Backend | `backend/`, FastAPI app at `taiga.main:app` |
-| Startup | `uvicorn taiga.main:app --host 0.0.0.0 --port $PORT` for Render |
-| Python packaging | `backend/pyproject.toml`, setuptools, `pip install -e ".[dev]"` |
-| Database | SQLAlchemy engine from `DATABASE_URL` |
-| Migrations | Alembic under `backend/alembic/` |
-| CORS | `FRONTEND_ORIGINS` environment variable |
-| Authentication | Cloudflare Access JWT validation in production; LocalAuth only in local |
-| Health | production public endpoint is `GET /api/health` |
-| File uploads | local filesystem manifest writes under `LOCAL_STORAGE_ROOT/uploads` |
-| CI | `.github/workflows/ci.yml` |
-| AWS infra | `infra/` preserved |
-| Cloudflare native assessment | `docs/phase-7-cloudflare/` |
+本番フロントエンドの `VITE_API_BASE_URL` は `https://app.taiganova.app` にする。
 
-## Service Responsibility Matrix
+理由:
 
-| Service | Responsibility | Free-tier caveat |
-|---|---|---|
-| Cloudflare Pages | Frontend hosting, CDN, HTTPS, SPA fallback | Limits/pricing can change; owner must verify before production |
-| Render Free | FastAPI process and health endpoint | Cold starts are expected after idle periods |
-| Neon Free | PostgreSQL database | Storage/compute limits and sleep behavior require owner verification |
-| Cloudflare R2 | Optional future durable upload/object storage | Not introduced in Phase 7.2 |
+- `app.taiganova.app` は Cloudflare Access で保護される。
+- `app.taiganova.app/api/*` は Pages Function が Render raw URL に proxy する。
+- Cloudflare Access JWT が Pages Function から Render に転送される。
+- Render の `onrender.com` を Cloudflare proxied CNAME にすると Cloudflare 側で `DNS points to prohibited IP` になった。
 
-## Environment Variables
+`api.taiganova.app` は direct health 確認と Render custom domain 確認用として残す。
 
-Names only:
+## 環境変数
 
-### Frontend
+Frontend:
 
-- `VITE_API_BASE_URL`
+- `VITE_API_BASE_URL=https://app.taiganova.app`
 
-### Backend
+Backend:
 
-- `APP_ENV`
-- `LOCAL_AUTH_ENABLED`
+- `APP_ENV=production`
+- `LOCAL_AUTH_ENABLED=false`
 - `DATABASE_URL`
-- `FRONTEND_ORIGINS`
-- `RUNNER_ENABLED`
-- `EXAM_ENABLED`
-- `RATE_LIMIT_ENABLED`
+- `MIGRATION_DATABASE_URL`
+- `FRONTEND_ORIGINS=https://app.taiganova.app`
+- `RUNNER_ENABLED=false`
+- `EXAM_ENABLED=false`
+- `RATE_LIMIT_ENABLED=true`
 - `RATE_LIMIT_WINDOW_SECONDS`
 - `RATE_LIMIT_MAX_REQUESTS`
 - `WORKER_IDLE_POLL_SECONDS`
 - `WORKER_ERROR_RETRY_SECONDS`
-- `CLOUDFLARE_ACCESS_TEAM_DOMAIN`
+- `CLOUDFLARE_ACCESS_TEAM_DOMAIN=https://taiganova.cloudflareaccess.com`
 - `CLOUDFLARE_ACCESS_AUD`
-- `AUTHORIZED_USER_EMAILS`
+- `AUTHORIZED_USER_EMAILS=shomabirdie@icloud.com,taiga-albatross@softbank.ne.jp`
 
-## Cloudflare Pages Setup
+`CLOUDFLARE_ACCESS_AUD` は `taiga-nova-web` の audience を使う。
 
+## Cloudflare Pages
+
+- Project: `taiga-nova-web`
 - Root directory: `frontend`
 - Build command: `npm install && npm run build`
 - Output directory: `dist`
-- Production variable: `VITE_API_BASE_URL=https://api.<domain>`
-- SPA fallback: `frontend/public/_redirects`
+- Custom domain: `app.taiganova.app`
+- Production build variable: `VITE_API_BASE_URL=https://app.taiganova.app`
 
-`VITE_API_BASE_URL` is required in production and must use HTTPS.
+Direct deploy 例:
 
-## Render Backend Setup
+```bash
+cd frontend
+VITE_API_BASE_URL=https://app.taiganova.app npm run build
+npx wrangler pages deploy dist --project-name=taiga-nova-web --branch=main --commit-dirty=true
+```
 
-Use `render.yaml` or manual setup:
+## Pages Function proxy
 
-- Service type: Web Service
+`frontend/functions/api/[[path]].ts` が `/api/*` を Render raw URL に転送する。
+
+```text
+https://app.taiganova.app/api/health
+  -> Pages Function
+  -> https://taiga-nova-api.onrender.com/api/health
+```
+
+Access JWT を含む request header を Render に渡すため、バックエンドは Cloudflare Access JWT を検証できる。
+
+## Render backend
+
+- Service: `taiga-nova-api`
 - Runtime: Python
 - Root directory: `backend`
 - Build command: `pip install -e ".[dev]"`
 - Start command: `uvicorn taiga.main:app --host 0.0.0.0 --port $PORT`
 - Health check path: `/api/health`
+- Raw URL: `https://taiga-nova-api.onrender.com`
+- Custom domain: `api.taiganova.app`
 
-Required Render secrets:
+Render Free は idle 後の cold start がある。フロントエンドはタイムアウト時に日本語の再試行状態を表示する。
 
-- `DATABASE_URL`
-- `MIGRATION_DATABASE_URL`
-- `FRONTEND_ORIGINS`
-- `CLOUDFLARE_ACCESS_TEAM_DOMAIN`
-- `CLOUDFLARE_ACCESS_AUD`
-- `AUTHORIZED_USER_EMAILS`
+## Neon PostgreSQL
 
-Set:
+- Project: `taiga-nova-production`
+- Database: `taiga`
+- Migration revision: `0002_phase5_performance_indexes`
 
-- `APP_ENV=production`
-- `LOCAL_AUTH_ENABLED=false`
-- `RUNNER_ENABLED=false`
+接続文字列は gitignored の operator env に保存する。
 
-## Neon PostgreSQL Setup
-
-1. Create a Neon project.
-2. Create/select a production database.
-3. Copy the PostgreSQL connection string.
-4. Add the connection string to Render as `DATABASE_URL`.
-5. Ensure SSL is required in the connection string.
-6. Run Alembic migrations from an approved operator machine or one-off Render shell.
-7. Verify `alembic current` and application readiness.
-
-The backend normalizes `postgres://` and `postgresql://` URLs to SQLAlchemy's `postgresql+psycopg://`
-driver form at runtime.
-
-## Authentication
-
-Cloudflare Access must protect both `app.<domain>` and `api.<domain>`. The backend independently
-validates `Cf-Access-Jwt-Assertion` and maps only approved emails to existing application users.
-Do not run production with `APP_ENV=local`.
-
-## Cold Starts
-
-Render Free can delay the first backend request after idle time. The frontend displays:
-
-```text
-サーバーを起動しています。初回のみ数十秒かかる場合があります。
+```bash
+NEON_API_KEY="<redacted>" \
+python3 scripts/neon_prepare.py \
+  --project-name taiga-nova-production \
+  --database-name taiga \
+  --role-name taiga \
+  --env-file .env.neon.local
 ```
 
-Requests have a bounded frontend timeout and show a retry action instead of an infinite spinner.
+Migration:
 
-## File Storage Limitation
+```bash
+cd backend
+set -a
+source ../.env.neon.local
+set +a
+FRONTEND_ORIGINS=https://app.taiganova.app \
+CLOUDFLARE_ACCESS_TEAM_DOMAIN=https://taiganova.cloudflareaccess.com \
+CLOUDFLARE_ACCESS_AUD="<web-access-audience>" \
+AUTHORIZED_USER_EMAILS=shomabirdie@icloud.com,taiga-albatross@softbank.ne.jp \
+../.venv/bin/alembic upgrade head
+```
 
-Current upload completion writes a manifest to local disk under `LOCAL_STORAGE_ROOT/uploads`.
-Render local disk is not durable storage. For Phase 7.2:
+## 認証
 
-- Do not rely on uploads for durable production evidence.
-- Treat upload-backed flows as limited until R2 or another durable object store is implemented.
-- Keep `RUNNER_ENABLED=false`; hidden tests and generated runner artifacts must not be exposed.
+Cloudflare Access は `app.taiganova.app` と `api.taiganova.app` の両方に設定する。
 
-## Cost And Upgrade Triggers
+Policy:
 
-Target cost is approximately 0 JPY/month for two users, subject to provider free-tier changes.
+- Action: Allow
+- Include:
+  - `shomabirdie@icloud.com`
+  - `taiga-albatross@softbank.ne.jp`
 
-Consider paid upgrade when:
+Login method:
 
-- Render cold starts are frustrating.
-- Backend uptime matters.
-- Neon storage/compute limits are reached.
-- More than two users use the system.
-- Durable file uploads become important.
-- Automated backups become mandatory.
-- Runner execution is introduced.
+- One-time PIN
 
-Expected first paid upgrade: Render always-on backend.
+バックエンドは `Cf-Access-Jwt-Assertion` を検証し、許可メールを DB の既存 active user に対応付ける。`Cf-Access-Authenticated-User-Email` だけは信用しない。
+
+## Storage 制限
+
+現在の upload completion は `LOCAL_STORAGE_ROOT/uploads` に manifest を書く。Render local disk は永続ストレージではない。
+
+- 本番で upload-backed evidence を永続証跡として扱わない。
+- durable object storage は R2 などを将来導入する。
+- runner は無効のままにする。
+
+## Upgrade 判断
+
+最初の想定コストは 2 ユーザーでおおむね 0 JPY/月。ただし provider free tier は変わり得る。
+
+有料化を検討する条件:
+
+- Render cold start が運用上つらい。
+- backend uptime が重要になる。
+- Neon storage/compute 制限に近づく。
+- 利用者が 2 人を超える。
+- durable upload が必要になる。
+- 自動 backup が必要になる。
+- runner 実行を導入する。

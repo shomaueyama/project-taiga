@@ -1,43 +1,63 @@
-# Render Backend Deployment
+# Render Backend デプロイ
 
-Status: plan only. No Render service was created.
+Status: Render service `taiga-nova-api` は作成済み。現在 deploy は `live`。
 
 ## Service
 
-Use the checked-in `render.yaml`.
+- Service type: Web Service
+- Runtime: Python
+- Root directory: `backend`
+- Build command: `pip install -e ".[dev]"`
+- Start command: `uvicorn taiga.main:app --host 0.0.0.0 --port $PORT`
+- Health check path: `/api/health`
+- Raw URL: `https://taiga-nova-api.onrender.com`
+- Custom domain: `api.taiganova.app`
 
-- Runtime: Python.
-- Root directory: `backend`.
-- Build command: `pip install -e ".[dev]"`.
-- Start command: `uvicorn taiga.main:app --host 0.0.0.0 --port $PORT`.
-- Health check path: `/api/health`.
+## 必須環境変数
 
-Required environment variables:
+```text
+APP_ENV=production
+LOCAL_AUTH_ENABLED=false
+RUNNER_ENABLED=false
+EXAM_ENABLED=false
+RATE_LIMIT_ENABLED=true
+DATABASE_URL=<Neon runtime URL>
+MIGRATION_DATABASE_URL=<Neon migration URL>
+FRONTEND_ORIGINS=https://app.taiganova.app
+CLOUDFLARE_ACCESS_TEAM_DOMAIN=https://taiganova.cloudflareaccess.com
+CLOUDFLARE_ACCESS_AUD=<taiga-nova-web の Access audience>
+AUTHORIZED_USER_EMAILS=shomabirdie@icloud.com,taiga-albatross@softbank.ne.jp
+```
 
-- `APP_ENV=production`
-- `LOCAL_AUTH_ENABLED=false`
-- `DATABASE_URL`
-- `MIGRATION_DATABASE_URL`
-- `FRONTEND_ORIGINS=https://app.<domain>`
-- `RUNNER_ENABLED=false`
-- `EXAM_ENABLED=false`
-- `RATE_LIMIT_ENABLED=true`
-- `CLOUDFLARE_ACCESS_TEAM_DOMAIN`
-- `CLOUDFLARE_ACCESS_AUD`
-- `AUTHORIZED_USER_EMAILS`
+`CLOUDFLARE_ACCESS_AUD` は `taiga-nova-api` ではなく `taiga-nova-web` の audience を使う。アプリ内 API 通信は `app.taiganova.app/api/*` の Pages Function proxy 経由で Render に届くため。
 
-## Custom Hostname
+## Custom domain
 
-Expose the API through Cloudflare as `api.<domain>`. The raw Render hostname may serve
-`GET /api/health`, but authenticated application access must still fail without a valid
-`Cf-Access-Jwt-Assertion`.
+`api.taiganova.app` は Render custom domain として設定済み。Cloudflare DNS は DNS-only CNAME にする。
 
-## Cold Starts
+```text
+api.taiganova.app CNAME taiga-nova-api.onrender.com DNS-only
+```
 
-Render Free may sleep after idle periods. The frontend shows a bounded Japanese retry state for
-timeouts and server errors.
+Cloudflare proxied CNAME にすると `DNS points to prohibited IP` になるため、アプリ内通信には使わない。アプリ内通信は `app.taiganova.app/api/*` を使う。
 
-Official references:
+## Cold start
+
+Render Free は idle 後に cold start する。フロントエンドは API timeout 時に日本語の再試行表示を出す。
+
+## Smoke
+
+```bash
+curl -i https://api.taiganova.app/api/health
+curl -i https://api.taiganova.app/api/v1/me
+```
+
+期待:
+
+- `/api/health` は 200
+- `/api/v1/me` は Access JWT なしで 401
+
+公式参照:
 
 - https://render.com/docs/deploy-fastapi
 - https://render.com/docs/health-checks
