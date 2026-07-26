@@ -259,6 +259,10 @@ export type UserPage = z.infer<typeof userPageSchema>;
 export type FeatureFlagList = z.infer<typeof featureFlagListSchema>;
 export type Analytics = z.infer<typeof analyticsSchema>;
 export type CurriculumVersionPage = z.infer<typeof curriculumVersionPageSchema>;
+export type LoginInput = {
+  email: string;
+  password: string;
+};
 
 export function getStoredLocalUser(): string {
   return window.localStorage.getItem(authStorageKey) ?? "taiga@example.local";
@@ -315,6 +319,26 @@ async function apiPost<T>(path: string, body: unknown, schema: z.ZodType<T>): Pr
   return schema.parse(await response.json());
 }
 
+async function apiPostWithoutIdempotency<T>(
+  path: string,
+  body: unknown,
+  schema: z.ZodType<T>,
+): Promise<T> {
+  const response = await fetchWithTimeout(`${apiBaseUrl}/api/v1${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      ...authHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new ApiError(`API request failed: ${response.status}`, response.status);
+  }
+  return schema.parse(await response.json());
+}
+
 async function apiPatch<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
   const response = await fetchWithTimeout(`${apiBaseUrl}/api/v1${path}`, {
     method: "PATCH",
@@ -360,7 +384,7 @@ export function apiErrorMessage(error: unknown): string {
       return "サーバーを起動しています。初回のみ数十秒かかる場合があります。";
     }
     if (error.status === 401) {
-      return "認証セッションを確認できません。Cloudflare Accessで再認証してください。";
+      return "メールアドレスまたはパスワードを確認してください。";
     }
     if (error.status === 403) {
       return "このメールアドレスにはTAIGA NOVAへのアクセス権がありません。";
@@ -374,6 +398,14 @@ export function apiErrorMessage(error: unknown): string {
 
 export function getMe(): Promise<UserProfile> {
   return apiGet("/me", userProfileSchema);
+}
+
+export function loginWithPassword(input: LoginInput): Promise<UserProfile> {
+  return apiPostWithoutIdempotency("/auth/login", input, userProfileSchema);
+}
+
+export async function logoutSession(): Promise<void> {
+  await apiPostWithoutIdempotency("/auth/logout", {}, z.object({ status: z.string() }));
 }
 
 export function getDashboard(): Promise<Dashboard> {

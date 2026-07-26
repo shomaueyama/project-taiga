@@ -36,6 +36,15 @@ class Settings(BaseSettings):
         default=None,
         validation_alias="AUTHORIZED_USER_EMAILS",
     )
+    app_login_credentials: str | None = Field(
+        default=None,
+        validation_alias="APP_LOGIN_CREDENTIALS",
+    )
+    app_session_secret: str | None = Field(default=None, validation_alias="APP_SESSION_SECRET")
+    app_session_ttl_seconds: int = Field(
+        default=60 * 60 * 24 * 14,
+        validation_alias="APP_SESSION_TTL_SECONDS",
+    )
     runner_enabled: bool = Field(default=False, validation_alias="RUNNER_ENABLED")
     exam_enabled: bool = Field(default=False, validation_alias="EXAM_ENABLED")
     rate_limit_enabled: bool = Field(default=True, validation_alias="RATE_LIMIT_ENABLED")

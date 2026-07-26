@@ -184,6 +184,89 @@ textarea:focus-visible,
   color: var(--color-text);
 }
 
+.auth-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background:
+    linear-gradient(135deg, rgba(24, 36, 61, 0.95), rgba(51, 95, 138, 0.82)),
+    var(--nova-bg-canvas);
+}
+
+.auth-panel {
+  width: min(100%, 440px);
+  display: grid;
+  gap: var(--space-6);
+  padding: var(--space-8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-lg);
+  background: var(--nova-surface);
+  box-shadow: 0 24px 80px rgba(23, 32, 51, 0.24);
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.auth-brand img {
+  width: 56px;
+  height: 56px;
+}
+
+.auth-brand h1,
+.auth-brand p {
+  margin: 0;
+}
+
+.auth-brand h1 {
+  font-size: var(--font-size-3xl);
+}
+
+.auth-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.auth-form label {
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.input-with-icon {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--nova-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--nova-surface);
+}
+
+.input-with-icon svg {
+  color: var(--color-text-muted);
+}
+
+.input-with-icon input {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+}
+
+.auth-submit {
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
 .nav-panel,
 .login-panel,
 .page-stack,

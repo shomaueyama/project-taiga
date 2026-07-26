@@ -9,14 +9,16 @@ import {
   GraduationCap,
   LayoutDashboard,
   LogOut,
+  Mail,
   Menu,
+  ShieldCheck,
   PlayCircle,
   Settings,
   Sparkles,
   Telescope,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import novaMark from "../assets/brand/nova-mark.svg";
@@ -43,6 +45,8 @@ import {
   getScheduleDay,
   getScheduleSummary,
   getStoredLocalUser,
+  loginWithPassword,
+  logoutSession,
   reviewSubmission,
   runSubmission,
   setStoredLocalUser,
@@ -115,6 +119,8 @@ export function App() {
   const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(() =>
     emptyScheduleForm(todayIsoDate()),
   );
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
 
   const health = useQuery({ queryKey: ["health"], queryFn: getHealth });
   const me = useQuery({ queryKey: ["me", localUser], queryFn: getMe });
@@ -122,6 +128,20 @@ export function App() {
   const isSignedIn = me.isSuccess;
   const canReview = me.data?.role === "reviewer" || me.data?.role === "admin";
   const canAdmin = me.data?.role === "admin";
+  const login = useMutation({
+    mutationFn: loginWithPassword,
+    onSuccess: async () => {
+      setLoginPassword("");
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
+    },
+  });
+  const logout = useMutation({
+    mutationFn: logoutSession,
+    onSuccess: async () => {
+      await queryClient.clear();
+      window.location.assign("/");
+    },
+  });
   const dashboard = useQuery({
     queryKey: ["dashboard", localUser],
     queryFn: getDashboard,
@@ -270,6 +290,11 @@ export function App() {
     navigate("/dashboard");
   }
 
+  function submitLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    login.mutate({ email: loginEmail.trim(), password: loginPassword });
+  }
+
   function openAssignment(assignmentId: string) {
     setSelectedAssignmentId(assignmentId);
     navigate(`/assignments/${assignmentId}`);
@@ -377,6 +402,54 @@ export function App() {
     return () => media.removeEventListener("change", updateNarrowViewport);
   }, []);
 
+  if (!isLocalEnvironment && me.isError) {
+    return (
+      <main className="auth-screen" aria-labelledby="login-title">
+        <section className="auth-panel">
+          <div className="auth-brand">
+            <img src={novaMark} alt="" />
+            <div>
+              <p className="eyebrow">TAIGA NOVA</p>
+              <h1 id="login-title">ログイン</h1>
+            </div>
+          </div>
+          <form className="auth-form" onSubmit={submitLogin}>
+            <label htmlFor="login-email">メールアドレス</label>
+            <div className="input-with-icon">
+              <Mail aria-hidden size={18} />
+              <input
+                id="login-email"
+                name="email"
+                type="email"
+                autoComplete="username"
+                value={loginEmail}
+                onChange={(event) => setLoginEmail(event.target.value)}
+                required
+              />
+            </div>
+            <label htmlFor="login-password">パスワード</label>
+            <div className="input-with-icon">
+              <ShieldCheck aria-hidden size={18} />
+              <input
+                id="login-password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                value={loginPassword}
+                onChange={(event) => setLoginPassword(event.target.value)}
+                required
+              />
+            </div>
+            {login.isError ? <Alert tone="danger">{apiErrorMessage(login.error)}</Alert> : null}
+            <button className="primary-action auth-submit" type="submit" disabled={login.isPending}>
+              ログイン
+            </button>
+          </form>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <div className={`shell ${isMobileNavOpen ? "nav-open" : ""}`}>
       <a className="skip-link" href="#main-content">
@@ -454,10 +527,15 @@ export function App() {
           <section className="login-panel" aria-label="ログイン中の利用者">
             <h2>ログイン中</h2>
             <p>{me.data ? `${me.data.displayName} · ${labelForRole(me.data.role)}` : "Cloudflare Access"}</p>
-            <a className="button-link secondary logout-link" href="/cdn-cgi/access/logout">
+            <button
+              className="button-link secondary logout-link"
+              type="button"
+              disabled={logout.isPending}
+              onClick={() => logout.mutate()}
+            >
               <LogOut aria-hidden size={18} />
               ログアウト
-            </a>
+            </button>
           </section>
         )}
       </aside>

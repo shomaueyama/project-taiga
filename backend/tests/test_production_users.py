@@ -2,9 +2,11 @@ from pathlib import Path
 
 import pytest
 from alembic.config import Config
+from fastapi import HTTPException
 from sqlalchemy import text
 
 from alembic import command
+from taiga.auth import authenticate_app_login, create_session_token, email_from_session_token
 from taiga.config import Settings
 from taiga.infrastructure.database import SessionLocal
 from taiga.production_users import (
@@ -112,6 +114,29 @@ def test_bootstrap_requires_production_environment_for_apply() -> None:
             launch_specs(),
             apply=True,
         )
+
+
+def test_password_login_credentials_and_session_tokens() -> None:
+    settings = Settings(
+        APP_ENV="production",
+        LOCAL_AUTH_ENABLED=False,
+        DATABASE_URL="postgresql+psycopg://user:pass@db.example.com/taiga?sslmode=require",
+        FRONTEND_ORIGINS="https://app.taiganova.app",
+        RUNNER_ENABLED=False,
+        CLOUDFLARE_ACCESS_TEAM_DOMAIN="https://team.cloudflareaccess.com",
+        CLOUDFLARE_ACCESS_AUD="aud",
+        AUTHORIZED_USER_EMAILS="shomabirdie@icloud.com,taiga-albatross@softbank.ne.jp",
+        APP_LOGIN_CREDENTIALS="shomabirdie@icloud.com:admin-pass,taiga-albatross@softbank.ne.jp:learner-pass",
+        APP_SESSION_SECRET="test-session-secret",  # noqa: S106
+    )
+
+    email = authenticate_app_login("SHOMABIRDIE@ICLOUD.COM", "admin-pass", settings)
+    token = create_session_token(email, settings)
+
+    assert email == "shomabirdie@icloud.com"
+    assert email_from_session_token(token, settings) == "shomabirdie@icloud.com"
+    with pytest.raises(HTTPException, match="Invalid email or password"):
+        authenticate_app_login("shomabirdie@icloud.com", "wrong", settings)
 
 
 def test_bootstrap_upserts_exact_two_active_users_idempotently() -> None:

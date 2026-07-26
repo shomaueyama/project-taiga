@@ -58,11 +58,13 @@ function installFetch(
     runnerEnabled?: boolean;
     examEnabled?: boolean;
     appEnv?: string;
+    requireLogin?: boolean;
     todayAssignment?: boolean;
     completedWeeks?: number | null;
   } = {},
 ) {
   const calls: Array<{ path: string; method: string; body: unknown }> = [];
+  let loggedIn = !options.requireLogin;
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
     const path = url.pathname;
@@ -79,7 +81,18 @@ function installFetch(
       });
     }
     if (path === "/api/v1/me") {
+      if (!loggedIn) {
+        return response({ detail: "Authentication required" }, 401);
+      }
       return response(userForEmail(localUserFrom(init)));
+    }
+    if (path === "/api/v1/auth/login") {
+      loggedIn = true;
+      return response(userForEmail(String(body?.email ?? "admin@example.local")));
+    }
+    if (path === "/api/v1/auth/logout") {
+      loggedIn = false;
+      return response({ status: "ok" });
     }
     if (path === "/api/v1/dashboard") {
       const today = options.todayAssignment
@@ -379,7 +392,24 @@ describe("App", () => {
     expect(await screen.findByText("Typing basics")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "デモ回答を提出" })).not.toBeInTheDocument();
     expect(screen.queryByText("新しい提出はまだありません。")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "ログアウト" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ログアウト" })).toBeInTheDocument();
+  });
+
+  it("shows the production password login before the app shell", async () => {
+    installFetch({ appEnv: "production", requireLogin: true });
+    renderApp(["/dashboard"]);
+
+    expect(await screen.findByRole("heading", { name: "ログイン" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "ダッシュボード" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("メールアドレス"), {
+      target: { value: "admin@example.local" },
+    });
+    fireEvent.change(screen.getByLabelText("パスワード"), {
+      target: { value: "password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "ログイン" }));
+
+    expect(await screen.findByRole("heading", { name: "ダッシュボード" })).toBeInTheDocument();
   });
 
   it("renders populated dashboard rows, opens assignment detail, and handles mobile drawer", async () => {

@@ -36,6 +36,7 @@ from taiga.api_schemas import (
     FeatureFlagList,
     InviteUserRequest,
     LearningAnalytics,
+    LoginRequest,
     NotificationPage,
     NotificationPreferenceList,
     OralReviewRequest,
@@ -64,7 +65,14 @@ from taiga.assignment_queries import (
     get_progress,
     list_assignments,
 )
-from taiga.auth import Principal, get_current_principal
+from taiga.auth import (
+    SESSION_COOKIE_NAME,
+    Principal,
+    authenticate_app_login,
+    create_session_token,
+    get_current_principal,
+    principal_for_email,
+)
 from taiga.config import Settings, get_settings
 from taiga.errors import AppError
 from taiga.exam_service import (
@@ -195,6 +203,45 @@ def me(principal: Principal = principal_dependency) -> UserProfile:
         status=principal.status,
         timezone=principal.timezone,
     )
+
+
+@app.post("/api/v1/auth/login", response_model=UserProfile, tags=["identity"])
+def login(
+    request: LoginRequest,
+    response: Response,
+    settings: Settings = settings_dependency,
+    session: Session = session_dependency,
+) -> UserProfile:
+    email = authenticate_app_login(request.email, request.password, settings)
+    principal = principal_for_email(session, email)
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        create_session_token(email, settings),
+        max_age=settings.app_session_ttl_seconds,
+        httponly=True,
+        secure=settings.app_env == "production",
+        samesite="lax",
+        path="/",
+    )
+    return UserProfile(
+        id=principal.id,
+        displayName=principal.display_name,
+        role=principal.role,
+        status=principal.status,
+        timezone=principal.timezone,
+    )
+
+
+@app.post("/api/v1/auth/logout", tags=["identity"])
+def logout(response: Response, settings: Settings = settings_dependency) -> dict[str, str]:
+    response.delete_cookie(
+        SESSION_COOKIE_NAME,
+        httponly=True,
+        secure=settings.app_env == "production",
+        samesite="lax",
+        path="/",
+    )
+    return {"status": "ok"}
 
 
 @app.get("/api/v1/dashboard", response_model=Dashboard, tags=["learning"])
