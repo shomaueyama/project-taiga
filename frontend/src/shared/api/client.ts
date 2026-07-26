@@ -645,16 +645,15 @@ export function getExams(): Promise<ExamPage> {
 export function reviewSubmission(
   submissionId: string,
   result: "approved" | "needs_revision",
+  comment: string,
 ): Promise<Review> {
+  const dailyProgress = result === "approved" ? "LGTM" : "needs_action";
   return apiPost(
     `/submissions/${submissionId}/reviews`,
     {
       result,
-      rubric: { correctness: "checked", clarity: "checked" },
-      comment:
-        result === "approved"
-          ? "Approved from local MVP review."
-          : "Please revise the answer and resubmit.",
+      rubric: { dailyProgress },
+      comment,
     },
     reviewSchema,
   );

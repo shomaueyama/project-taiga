@@ -225,7 +225,7 @@ describe("api client", () => {
 
     await expect(createDemoSubmission(uuid2)).resolves.toMatchObject({ id: uuid3, version: 1 });
     await expect(runSubmission(uuid3)).resolves.toMatchObject({ status: "succeeded" });
-    await expect(reviewSubmission(uuid3, "approved")).resolves.toMatchObject({ result: "approved" });
+    await expect(reviewSubmission(uuid3, "approved", "LGTM。今日の進捗はOK。")).resolves.toMatchObject({ result: "approved" });
     await expect(deleteSubmission(uuid3)).resolves.toBeUndefined();
     await expect(createExamAttempt(uuid2)).resolves.toMatchObject({ status: "reserved" });
     await expect(startExamAttempt(uuid1)).resolves.toMatchObject({ attempt: { status: "in_progress" } });
@@ -236,6 +236,8 @@ describe("api client", () => {
     expect(calls.map((call) => call.path)).toContain(`/api/v1/submissions/${uuid3}`);
     expect(calls.find((call) => call.path.endsWith("/reviews"))?.body).toMatchObject({
       result: "approved",
+      comment: "LGTM。今日の進捗はOK。",
+      rubric: { dailyProgress: "LGTM" },
     });
   });
 

@@ -592,11 +592,17 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("link", { name: "レビュー" }));
     expect(await screen.findByRole("heading", { name: "提出管理" })).toBeInTheDocument();
     expect(screen.getByText("TASK-001 / 上山 虎雅 / v1")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: `${submissionId.slice(0, 8)}に修正依頼` }));
+    expect(screen.getByRole("button", { name: "要対応にする" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("先生コメント"), {
+      target: { value: "要対応: 写真が読めないので再提出。" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "要対応にする" }));
 
     expect(await screen.findByText("修正依頼")).toBeInTheDocument();
     expect(calls.find((call) => call.path.endsWith("/reviews"))?.body).toMatchObject({
       result: "needs_revision",
+      comment: "要対応: 写真が読めないので再提出。",
+      rubric: { dailyProgress: "needs_action" },
     });
     fireEvent.click(screen.getByRole("button", { name: "提出を削除" }));
     expect(await screen.findByText("削除済み")).toBeInTheDocument();

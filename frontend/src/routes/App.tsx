@@ -131,6 +131,7 @@ export function App() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [reviewStatusFilter, setReviewStatusFilter] = useState("all");
+  const [reviewComments, setReviewComments] = useState<Record<string, string>>({});
 
   const health = useQuery({ queryKey: ["health"], queryFn: getHealth });
   const me = useQuery({ queryKey: ["me", localUser], queryFn: getMe });
@@ -258,10 +259,12 @@ export function App() {
     mutationFn: ({
       submissionId,
       result,
+      comment,
     }: {
       submissionId: string;
       result: "approved" | "needs_revision";
-    }) => reviewSubmission(submissionId, result),
+      comment: string;
+    }) => reviewSubmission(submissionId, result, comment),
     onSuccess: async (review) => {
       setLastReviewResult(review.result);
       await queryClient.invalidateQueries({ queryKey: ["review-queue", localUser] });
@@ -1060,21 +1063,36 @@ export function App() {
                     ) : null}
                   </div>
                   <div className="button-row">
+                    <label className="review-comment-field">
+                      先生コメント
+                      <textarea
+                        value={reviewComments[submission.id] ?? ""}
+                        placeholder="例: LGTM。今日の進捗はOK。 / 要対応: 写真が読めないので再提出。"
+                        onChange={(event) =>
+                          setReviewComments((current) => ({
+                            ...current,
+                            [submission.id]: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
                     <button
                       type="button"
                       disabled={
                         !canReview ||
                         submission.status !== "manual_review_pending" ||
-                        reviewPendingSubmission.isPending
+                        reviewPendingSubmission.isPending ||
+                        !(reviewComments[submission.id] ?? "").trim()
                       }
                       onClick={() =>
                         reviewPendingSubmission.mutate({
                           submissionId: submission.id,
                           result: "approved",
+                          comment: reviewComments[submission.id]?.trim() ?? "",
                         })
                       }
                     >
-                      {shortId(submission.id)}を承認
+                      LGTMで合格
                     </button>
                     <button
                       type="button"
@@ -1082,16 +1100,18 @@ export function App() {
                       disabled={
                         !canReview ||
                         submission.status !== "manual_review_pending" ||
-                        reviewPendingSubmission.isPending
+                        reviewPendingSubmission.isPending ||
+                        !(reviewComments[submission.id] ?? "").trim()
                       }
                       onClick={() =>
                         reviewPendingSubmission.mutate({
                           submissionId: submission.id,
                           result: "needs_revision",
+                          comment: reviewComments[submission.id]?.trim() ?? "",
                         })
                       }
                     >
-                      {shortId(submission.id)}に修正依頼
+                      要対応にする
                     </button>
                     {canAdmin ? (
                       <button
