@@ -681,6 +681,96 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.assignment-detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.assignment-detail-header p {
+  margin: var(--space-1) 0 0;
+}
+
+.assignment-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5) var(--space-6);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.assignment-panel {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+}
+
+.assignment-panel h2,
+.submission-form h2 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.plain-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.material-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.material-item {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-tinted);
+}
+
+.material-item div,
+.artifact-list {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.material-item span,
+.artifact-list span,
+.assignment-panel p {
+  color: var(--color-text-muted);
+}
+
+.submission-form {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.submission-form label {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
+
+.submission-form textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+
 .fatal-shell {
   min-height: 100vh;
   display: grid;
@@ -777,6 +867,48 @@ h2 {
   gap: var(--space-2);
 }
 
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.calendar-legend span {
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+.calendar-legend span::before {
+  content: "";
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-right: 6px;
+  border-radius: 2px;
+  background: var(--color-border);
+}
+
+.calendar-legend [data-tone="important"]::before {
+  background: var(--nova-yellow-600);
+}
+
+.calendar-legend [data-tone="overdue"]::before {
+  background: var(--color-danger);
+}
+
+.calendar-legend [data-tone="review"]::before {
+  background: var(--color-info);
+}
+
+.calendar-legend [data-tone="approved"]::before {
+  background: var(--color-success);
+}
+
 .calendar-weekdays,
 .calendar-grid {
   display: grid;
@@ -812,6 +944,13 @@ h2 {
 .calendar-cell[data-selected="true"] {
   outline: 3px solid var(--nova-focus);
   outline-offset: 0;
+}
+
+.calendar-cell[data-important="true"] {
+  border-color: rgba(200, 153, 50, 0.72);
+  background:
+    linear-gradient(90deg, rgba(200, 153, 50, 0.18), rgba(255, 255, 255, 0) 42%),
+    var(--color-surface);
 }
 
 .calendar-cell[data-status="learner_overdue"],
@@ -870,6 +1009,12 @@ h2 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.calendar-chip[data-important="true"] {
+  background: var(--nova-yellow-100);
+  color: #6f4e00;
+  font-weight: 800;
 }
 
 .schedule-detail-panel,
@@ -958,6 +1103,11 @@ h2 {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
+}
+
+.schedule-item-card[data-important="true"] {
+  border-color: rgba(200, 153, 50, 0.72);
+  background: linear-gradient(90deg, rgba(250, 241, 207, 0.9), rgba(255, 255, 255, 1) 52%);
 }
 
 .schedule-item-card[data-status="learner_overdue"],
@@ -1150,7 +1300,8 @@ button:disabled {
   .dashboard-grid,
   .mission-card,
   .schedule-summary-grid,
-  .schedule-admin-grid {
+  .schedule-admin-grid,
+  .assignment-detail-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1213,7 +1364,9 @@ button:disabled {
   }
 
   .priority-strip,
-  .schedule-item-heading {
+  .schedule-item-heading,
+  .assignment-detail-header,
+  .material-item {
     display: grid;
     grid-template-columns: 1fr;
   }

@@ -61,6 +61,7 @@ class CreateSubmissionRequest(StrictRequest):
     sourceType: Literal["public_git", "zip_upload", "file_upload"]
     repositoryUrl: str | None = Field(default=None, max_length=2048)
     commitHash: str | None = Field(default=None, max_length=128)
+    submissionNote: str | None = Field(default=None, max_length=5000)
     uploadIds: list[UUID] = Field(max_length=10)
 
 
@@ -70,6 +71,25 @@ class SubmissionResponse(BaseModel):
     version: int
     status: str
     createdAt: str
+    repositoryUrl: str | None = None
+    commitHash: str | None = None
+    submissionNote: str | None = None
+
+
+class AssignmentMaterial(BaseModel):
+    id: str
+    title: str
+    provider: str
+    type: str
+    url: str | None = None
+    required: bool = False
+    purpose: str | None = None
+    learningObjective: str | None = None
+
+
+class AssignmentArtifactRequirement(BaseModel):
+    path: str
+    kind: str
 
 
 class SubmissionDetail(BaseModel):
@@ -110,7 +130,12 @@ class ReviewQueuePage(BaseModel):
 
 class AssignmentDetail(BaseModel):
     assignment: AssignmentSummary
+    goal: str | None = None
     instructions: list[str]
+    approvalCriteria: list[str] = Field(default_factory=list)
+    materials: list[AssignmentMaterial] = Field(default_factory=list)
+    requiredArtifacts: list[AssignmentArtifactRequirement] = Field(default_factory=list)
+    submissionGuide: list[str] = Field(default_factory=list)
     submissionSpec: dict[str, Any]
     submissions: list[SubmissionSnapshot]
 

@@ -229,7 +229,7 @@ describe("api client", () => {
 
   it("maps production access and cold-start errors to Japanese messages", () => {
     expect(apiErrorMessage(new ApiError("timeout", 0))).toContain("起動");
-    expect(apiErrorMessage(new ApiError("unauthorized", 401))).toContain("再認証");
+    expect(apiErrorMessage(new ApiError("unauthorized", 401))).toContain("パスワード");
     expect(apiErrorMessage(new ApiError("forbidden", 403))).toContain("アクセス権");
     expect(apiErrorMessage(new ApiError("server", 503))).toContain("サーバー");
   });

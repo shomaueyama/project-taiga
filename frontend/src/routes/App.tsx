@@ -52,6 +52,7 @@ import {
   setStoredLocalUser,
   startExamAttempt,
   submitExamAttempt,
+  submitAssignmentEvidence,
   updateScheduleItem,
   type ScheduleDay,
   type ScheduleItem,
@@ -119,6 +120,11 @@ export function App() {
   const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(() =>
     emptyScheduleForm(todayIsoDate()),
   );
+  const [assignmentForm, setAssignmentForm] = useState({
+    repositoryUrl: "",
+    commitHash: "",
+    note: "",
+  });
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
@@ -128,6 +134,7 @@ export function App() {
   const isSignedIn = me.isSuccess;
   const canReview = me.data?.role === "reviewer" || me.data?.role === "admin";
   const canAdmin = me.data?.role === "admin";
+  const canSubmitAssignment = me.data?.role === "learner";
   const login = useMutation({
     mutationFn: loginWithPassword,
     onSuccess: async () => {
@@ -219,6 +226,18 @@ export function App() {
       setLastSubmissionId(submission.id);
       await queryClient.invalidateQueries({ queryKey: ["assignments", localUser] });
       await queryClient.invalidateQueries({ queryKey: ["assignment-detail", localUser] });
+    },
+  });
+  const submitEvidence = useMutation({
+    mutationFn: ({ assignmentId }: { assignmentId: string }) =>
+      submitAssignmentEvidence(assignmentId, assignmentForm),
+    onSuccess: async (submission) => {
+      setLastSubmissionId(submission.id);
+      setAssignmentForm({ repositoryUrl: "", commitHash: "", note: "" });
+      await queryClient.invalidateQueries({ queryKey: ["assignments", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["assignment-detail", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard", localUser] });
+      await queryClient.invalidateQueries({ queryKey: ["schedule-summary", localUser] });
     },
   });
   const runLastSubmission = useMutation({
@@ -332,6 +351,14 @@ export function App() {
       return;
     }
     saveScheduleItem.mutate({ ...payload, id: scheduleForm.id || undefined });
+  }
+
+  function submitAssignmentForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedAssignment || (!assignmentForm.note.trim() && !assignmentForm.repositoryUrl.trim())) {
+      return;
+    }
+    submitEvidence.mutate({ assignmentId: selectedAssignment });
   }
 
   const firstAssignment = assignments.data?.items[0];
@@ -683,6 +710,12 @@ export function App() {
                   {scheduleSummary.data.nextImportantTitle}
                 </Alert>
               ) : null}
+              <div className="calendar-legend" aria-label="カレンダー凡例">
+                <span data-tone="important">重要日</span>
+                <span data-tone="overdue">遅延</span>
+                <span data-tone="review">レビュー待ち</span>
+                <span data-tone="approved">完了</span>
+              </div>
               <ScheduleCalendar
                 month={scheduleMonth}
                 days={schedule.data?.days ?? []}
@@ -748,15 +781,148 @@ export function App() {
                 <EmptyState title="表示できる課題はありません。" />
               ) : null}
               <div className="detail-box" aria-label="課題詳細">
-                <strong>{assignmentDetail.data?.assignment.title ?? "課題を選択してください"}</strong>
-                <span>
-                  状態: <StatusBadge status={assignmentDetail.data?.assignment.status} />
-                </span>
-                <span>提出履歴: {assignmentDetail.data?.submissions.length ?? 0}件</span>
+                <div className="assignment-detail-header">
+                  <div>
+                    <strong>{assignmentDetail.data?.assignment.title ?? "課題を選択してください"}</strong>
+                    {assignmentDetail.data?.goal ? <p>{assignmentDetail.data.goal}</p> : null}
+                  </div>
+                  <StatusBadge status={assignmentDetail.data?.assignment.status} />
+                </div>
                 {assignmentDetail.isError ? (
                   <Alert tone="danger">課題を読み込めません。権限またはURLを確認してください。</Alert>
                 ) : null}
+                {assignmentDetail.data ? (
+                  <div className="assignment-detail-grid">
+                    <section className="assignment-panel" aria-labelledby="assignment-steps-title">
+                      <h2 id="assignment-steps-title">やること</h2>
+                      <ol className="plain-list">
+                        {assignmentDetail.data.instructions.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ol>
+                    </section>
+                    <section className="assignment-panel" aria-labelledby="assignment-materials-title">
+                      <h2 id="assignment-materials-title">教材</h2>
+                      <div className="material-list">
+                        {assignmentDetail.data.materials.map((material) => (
+                          <article className="material-item" key={material.id}>
+                            <div>
+                              <strong>{material.title}</strong>
+                              <span>
+                                {material.provider} · {material.required ? "必須" : "参考"}
+                              </span>
+                            </div>
+                            {material.url ? (
+                              <a href={material.url} target="_blank" rel="noreferrer">
+                                開く
+                              </a>
+                            ) : (
+                              <span>手元教材</span>
+                            )}
+                          </article>
+                        ))}
+                      </div>
+                    </section>
+                    <section className="assignment-panel" aria-labelledby="assignment-submit-title">
+                      <h2 id="assignment-submit-title">提出方法</h2>
+                      <ol className="plain-list">
+                        {assignmentDetail.data.submissionGuide.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ol>
+                      <div className="artifact-list" aria-label="提出物">
+                        <strong>提出物</strong>
+                        {assignmentDetail.data.requiredArtifacts.length > 0 ? (
+                          assignmentDetail.data.requiredArtifacts.map((artifact) => (
+                            <span key={`${artifact.path}-${artifact.kind}`}>
+                              {artifact.path} ({artifact.kind})
+                            </span>
+                          ))
+                        ) : (
+                          <span>回答メモまたはGitHub URL</span>
+                        )}
+                      </div>
+                    </section>
+                    <section className="assignment-panel" aria-labelledby="assignment-review-title">
+                      <h2 id="assignment-review-title">合格条件</h2>
+                      <ul className="plain-list">
+                        {assignmentDetail.data.approvalCriteria.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                      <p>提出履歴: {assignmentDetail.data.submissions.length}件</p>
+                    </section>
+                  </div>
+                ) : null}
               </div>
+              {canSubmitAssignment && assignmentDetail.data ? (
+                <form className="submission-form" onSubmit={submitAssignmentForm}>
+                  <div className="section-heading">
+                    <p className="eyebrow">SUBMIT</p>
+                    <h2>回答を提出</h2>
+                  </div>
+                  <label>
+                    GitHub URL（任意）
+                    <input
+                      type="url"
+                      value={assignmentForm.repositoryUrl}
+                      placeholder="https://github.com/..."
+                      onChange={(event) =>
+                        setAssignmentForm((current) => ({
+                          ...current,
+                          repositoryUrl: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Commit hash（任意）
+                    <input
+                      value={assignmentForm.commitHash}
+                      placeholder="abc123..."
+                      onChange={(event) =>
+                        setAssignmentForm((current) => ({
+                          ...current,
+                          commitHash: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    回答メモ
+                    <textarea
+                      required={!assignmentForm.repositoryUrl.trim()}
+                      value={assignmentForm.note}
+                      placeholder="やったこと、結果、詰まった点、スクリーンショットの場所などを書く"
+                      onChange={(event) =>
+                        setAssignmentForm((current) => ({
+                          ...current,
+                          note: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <div className="button-row">
+                    <button
+                      type="submit"
+                      className="primary-action"
+                      disabled={
+                        submitEvidence.isPending ||
+                        (!assignmentForm.note.trim() && !assignmentForm.repositoryUrl.trim())
+                      }
+                    >
+                      提出する
+                    </button>
+                  </div>
+                  <p aria-live="polite">
+                    {lastSubmissionId
+                      ? `提出しました。レビュー待ちです: ${shortId(lastSubmissionId)}`
+                      : submitEvidence.error
+                        ? "提出に失敗しました。入力内容を確認してください。"
+                        : "回答メモかGitHub URLのどちらかを入れて提出できます。"}
+                  </p>
+                </form>
+              ) : null}
               {isLocalEnvironment ? (
                 <>
                   <button
@@ -798,6 +964,14 @@ export function App() {
                   <div>
                     <strong>提出 {shortId(submission.id)}</strong>
                     <StatusBadge status={submission.status} />
+                    {submission.repositoryUrl ? (
+                      <a href={submission.repositoryUrl} target="_blank" rel="noreferrer">
+                        GitHub URLを開く
+                      </a>
+                    ) : null}
+                    {submission.submissionNote ? (
+                      <p className="submission-note-preview">{submission.submissionNote}</p>
+                    ) : null}
                   </div>
                   <div className="button-row">
                     <button
@@ -1048,12 +1222,15 @@ function ScheduleCalendar({
       <div className="calendar-grid">
         {days.map((day) => {
           const label = scheduleStatusLabels[day.representativeStatus] ?? "予定";
+          const importantItems = day.items.filter(isImportantScheduleItem);
+          const visibleItems = [...importantItems, ...day.items.filter((item) => !isImportantScheduleItem(item))];
           return (
             <button
               key={day.date}
               type="button"
               className="calendar-cell"
               data-status={day.representativeStatus}
+              data-important={importantItems.length > 0 ? "true" : undefined}
               data-selected={day.date === selectedDate ? "true" : undefined}
               data-muted={!isSameMonth(day.date, month) ? "true" : undefined}
               onClick={() => onSelectDate(day.date)}
@@ -1063,8 +1240,12 @@ function ScheduleCalendar({
               {day.isToday ? <span className="today-label">今日</span> : null}
               <span className="calendar-status-text">{label}</span>
               <span className="calendar-count">{day.items.length}件</span>
-              {day.items.slice(0, 2).map((item) => (
-                <span className="calendar-chip" key={item.id}>
+              {visibleItems.slice(0, 2).map((item) => (
+                <span
+                  className="calendar-chip"
+                  data-important={isImportantScheduleItem(item) ? "true" : undefined}
+                  key={item.id}
+                >
                   {item.title}
                 </span>
               ))}
@@ -1116,7 +1297,12 @@ function ScheduleDayDetail({
           const criteria = arrayMetadata(item.metadata.acceptanceCriteria);
           const evidence = arrayMetadata(item.metadata.allowedEvidenceTypes);
           return (
-            <article className="schedule-item-card" key={item.id} data-status={item.displayStatus}>
+            <article
+              className="schedule-item-card"
+              key={item.id}
+              data-status={item.displayStatus}
+              data-important={isImportantScheduleItem(item) ? "true" : undefined}
+            >
               <div className="schedule-item-heading">
                 <div>
                   <strong>{item.title}</strong>
@@ -1342,6 +1528,16 @@ function ScheduleAdminPanel({
 
 function arrayMetadata(value: unknown) {
   return Array.isArray(value) ? value.map(String) : [];
+}
+
+function isImportantScheduleItem(item: ScheduleItem) {
+  return (
+    item.priority >= 80 ||
+    item.itemType === "milestone" ||
+    item.itemType === "exam" ||
+    item.itemType === "piscine" ||
+    Boolean(item.milestoneKey)
+  );
 }
 
 function MissionReadinessCard({

@@ -72,9 +72,30 @@ const assignmentPageSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
+const assignmentMaterialSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  provider: z.string(),
+  type: z.string(),
+  url: z.string().nullable(),
+  required: z.boolean(),
+  purpose: z.string().nullable(),
+  learningObjective: z.string().nullable(),
+});
+
+const assignmentArtifactSchema = z.object({
+  path: z.string(),
+  kind: z.string(),
+});
+
 const assignmentDetailSchema = z.object({
   assignment: assignmentSummarySchema,
+  goal: z.string().nullable().optional(),
   instructions: z.array(z.string()),
+  approvalCriteria: z.array(z.string()).optional(),
+  materials: z.array(assignmentMaterialSchema).optional(),
+  requiredArtifacts: z.array(assignmentArtifactSchema).optional(),
+  submissionGuide: z.array(z.string()).optional(),
   submissionSpec: z.record(z.string(), z.unknown()),
   submissions: z.array(z.unknown()),
 });
@@ -144,6 +165,9 @@ const submissionSchema = z.object({
   version: z.number(),
   status: z.string(),
   createdAt: z.string(),
+  repositoryUrl: z.string().nullable().optional(),
+  commitHash: z.string().nullable().optional(),
+  submissionNote: z.string().nullable().optional(),
 });
 
 const reviewQueueSchema = z.object({
@@ -227,7 +251,19 @@ export type UserProfile = z.infer<typeof userProfileSchema>;
 export type AssignmentSummary = z.infer<typeof assignmentSummarySchema>;
 export type Dashboard = z.infer<typeof dashboardSchema>;
 export type AssignmentPage = z.infer<typeof assignmentPageSchema>;
-export type AssignmentDetail = z.infer<typeof assignmentDetailSchema>;
+export type AssignmentMaterial = z.infer<typeof assignmentMaterialSchema>;
+export type AssignmentArtifact = z.infer<typeof assignmentArtifactSchema>;
+export type AssignmentDetail = {
+  assignment: AssignmentSummary;
+  goal: string | null;
+  instructions: string[];
+  approvalCriteria: string[];
+  materials: AssignmentMaterial[];
+  requiredArtifacts: AssignmentArtifact[];
+  submissionGuide: string[];
+  submissionSpec: Record<string, unknown>;
+  submissions: unknown[];
+};
 export type ScheduleItem = z.infer<typeof scheduleItemSchema>;
 export type ScheduleDay = z.infer<typeof scheduleDaySchema>;
 export type SchedulePage = z.infer<typeof schedulePageSchema>;
@@ -416,8 +452,16 @@ export function getAssignments(): Promise<AssignmentPage> {
   return apiGet("/assignments", assignmentPageSchema);
 }
 
-export function getAssignment(id: string): Promise<AssignmentDetail> {
-  return apiGet(`/assignments/${id}`, assignmentDetailSchema);
+export async function getAssignment(id: string): Promise<AssignmentDetail> {
+  const detail = await apiGet(`/assignments/${id}`, assignmentDetailSchema);
+  return {
+    ...detail,
+    goal: detail.goal ?? null,
+    approvalCriteria: detail.approvalCriteria ?? [],
+    materials: detail.materials ?? [],
+    requiredArtifacts: detail.requiredArtifacts ?? [],
+    submissionGuide: detail.submissionGuide ?? [],
+  };
 }
 
 export function getSchedule(fromDate: string, toDate: string): Promise<SchedulePage> {
@@ -463,6 +507,50 @@ export async function createDemoSubmission(assignmentId: string): Promise<Submis
   return apiPost(
     `/assignments/${assignmentId}/submissions`,
     { sourceType: "file_upload", repositoryUrl: null, commitHash: null, uploadIds: [upload.id] },
+    submissionSchema,
+  );
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export async function submitAssignmentEvidence(
+  assignmentId: string,
+  input: { repositoryUrl: string; commitHash: string; note: string },
+): Promise<Submission> {
+  const repositoryUrl = input.repositoryUrl.trim() || null;
+  const commitHash = input.commitHash.trim() || null;
+  const note = input.note.trim();
+  const body = [
+    "# TAIGA NOVA 提出メモ",
+    "",
+    note || "提出メモは未入力です。",
+    "",
+    repositoryUrl ? `GitHub URL: ${repositoryUrl}` : null,
+    commitHash ? `Commit: ${commitHash}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const sha256 = await sha256Hex(body);
+  const sizeBytes = new TextEncoder().encode(body).byteLength;
+  const upload = await apiPost(
+    "/uploads/presign",
+    { originalName: "answer.md", mediaType: "text/markdown", sizeBytes, sha256 },
+    uploadSessionSchema,
+  );
+  await apiPost(`/uploads/${upload.id}/complete`, { sizeBytes, sha256 }, uploadSessionSchema);
+  return apiPost(
+    `/assignments/${assignmentId}/submissions`,
+    {
+      sourceType: repositoryUrl ? "public_git" : "file_upload",
+      repositoryUrl,
+      commitHash,
+      submissionNote: body,
+      uploadIds: [upload.id],
+    },
     submissionSchema,
   );
 }

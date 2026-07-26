@@ -15,6 +15,7 @@ from taiga.api_schemas import (
     SubmissionSnapshot,
 )
 from taiga.auth import Principal
+from taiga.material_catalog import materials_for_task
 
 
 def _learner_id_for_learning(session: Session, principal: Principal) -> Any:
@@ -83,7 +84,7 @@ def get_assignment(session: Session, principal: Principal, assignment_id: UUID) 
             text(
                 """
                 SELECT a.id, t.stable_code, t.title, a.scheduled_date, a.status::text,
-                       t.instructions_json, t.submission_spec_json
+                       t.goal, t.instructions_json, t.submission_spec_json
                 FROM task_assignments a
                 JOIN task_templates t ON t.id = a.task_template_id
                 WHERE a.id = :assignment_id AND a.learner_id = :learner_id
@@ -112,11 +113,32 @@ def get_assignment(session: Session, principal: Principal, assignment_id: UUID) 
         .all()
     )
     instructions_json = row["instructions_json"]
+    submission_spec = dict(row["submission_spec_json"])
     requirements = instructions_json.get("requirements") or []
+    approval_criteria = instructions_json.get("approvalCriteria") or []
+    material_ids = instructions_json.get("materials") or []
+    artifacts = submission_spec.get("artifacts") or []
     return AssignmentDetail(
         assignment=_summary(row),
+        goal=row["goal"],
         instructions=[str(item) for item in requirements],
-        submissionSpec=dict(row["submission_spec_json"]),
+        approvalCriteria=[str(item) for item in approval_criteria],
+        materials=materials_for_task(material_ids, row["goal"]),
+        requiredArtifacts=[
+            {
+                "path": str(item.get("path", "")),
+                "kind": str(item.get("kind", "file")),
+            }
+            for item in artifacts
+            if isinstance(item, dict) and item.get("path")
+        ],
+        submissionGuide=[
+            "教材を開いて、課題の要件を上から順に実行します。",
+            "提出物に書く内容、スクリーンショット、GitHub URLのいずれかを用意します。",
+            "回答メモに何をしたか、結果、詰まった点を書いて提出します。",
+            "提出後はレビュー待ちになります。修正依頼が出たら同じ画面から再提出します。",
+        ],
+        submissionSpec=submission_spec,
         submissions=[
             SubmissionSnapshot(
                 id=item["id"],

@@ -57,6 +57,9 @@ def _submission(row: Any) -> SubmissionResponse:
         version=row["submission_version"],
         status=row["status"],
         createdAt=row["created_at"].isoformat(),
+        repositoryUrl=row.get("repository_url"),
+        commitHash=row.get("commit_hash"),
+        submissionNote=(row.get("artifact_manifest_json") or {}).get("submissionNote"),
     )
 
 
@@ -285,6 +288,7 @@ def create_submission(
     manifest = {
         "uploadIds": [str(upload_id) for upload_id in request.uploadIds],
         "sourceType": request.sourceType,
+        "submissionNote": request.submissionNote,
     }
     submission_status = submission_status_after_creation()
     session.execute(
@@ -384,7 +388,8 @@ def get_submission_summary(
         session.execute(
             text(
                 """
-                SELECT id, assignment_id, submission_version, status::text, created_at
+                SELECT id, assignment_id, submission_version, status::text, created_at,
+                       repository_url, commit_hash, artifact_manifest_json
                 FROM submissions
                 WHERE id = :id AND (:is_reviewer OR learner_id = :learner_id)
                 """
@@ -450,7 +455,8 @@ def review_queue(session: Session, principal: Principal, limit: int = 20) -> Rev
         session.execute(
             text(
                 """
-                SELECT id, assignment_id, submission_version, status::text, created_at
+                SELECT id, assignment_id, submission_version, status::text, created_at,
+                       repository_url, commit_hash, artifact_manifest_json
                 FROM submissions
                 WHERE status = 'manual_review_pending'
                 ORDER BY created_at DESC

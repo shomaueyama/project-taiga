@@ -148,10 +148,10 @@ function installFetch(
                 endAt: null,
                 title: "基本情報：現在地確認",
                 description: "現在地確認を提出する。",
-                itemType: "assignment",
+                itemType: "milestone",
                 assignmentId,
                 milestoneKey: null,
-                priority: 10,
+                priority: 90,
                 dueAt: "2026-07-27T14:59:00Z",
                 sourceUrl: null,
                 isRequired: true,
@@ -195,10 +195,10 @@ function installFetch(
             endAt: null,
             title: "基本情報：現在地確認",
             description: "現在地確認を提出する。",
-            itemType: "assignment",
+            itemType: "milestone",
             assignmentId,
             milestoneKey: null,
-            priority: 10,
+            priority: 90,
             dueAt: "2026-07-27T14:59:00Z",
             sourceUrl: null,
             isRequired: true,
@@ -225,7 +225,23 @@ function installFetch(
           scheduledDate: "2026-07-23",
           status: "available",
         },
+        goal: "タイピングの基礎を確認する。",
         instructions: ["Submit a short answer."],
+        approvalCriteria: ["内容を自分の言葉で説明できる。"],
+        materials: [
+          {
+            id: "MAT-ETYPE",
+            title: "e-typing",
+            provider: "イータイピング",
+            type: "practice",
+            url: "https://www.e-typing.ne.jp/",
+            required: true,
+            purpose: "practice",
+            learningObjective: "入力の基礎を確認する。",
+          },
+        ],
+        requiredArtifacts: [{ path: "answer.md", kind: "file" }],
+        submissionGuide: ["教材を開く。", "回答メモを書いて提出する。"],
         submissionSpec: {},
         submissions: [],
       });
@@ -302,7 +318,12 @@ function installFetch(
     return response({ error: path }, 404);
   });
   vi.stubGlobal("fetch", fetchMock);
-  vi.stubGlobal("crypto", { randomUUID: vi.fn(() => "idempotency-key") });
+  vi.stubGlobal("crypto", {
+    randomUUID: vi.fn(() => "idempotency-key"),
+    subtle: {
+      digest: vi.fn(async () => new Uint8Array(32).buffer),
+    },
+  });
   return { calls, fetchMock };
 }
 
@@ -395,6 +416,20 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "ログアウト" })).toBeInTheDocument();
   });
 
+  it("submits learner evidence from the assignment detail form", async () => {
+    const { calls } = installFetch({ appEnv: "production" });
+    renderApp(["/assignments"]);
+
+    expect(await screen.findByText("e-typing")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("回答メモ"), {
+      target: { value: "タイピング練習を完了しました。" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "提出する" }));
+
+    expect(await screen.findByText(`提出しました。レビュー待ちです: ${submissionId.slice(0, 8)}`)).toBeInTheDocument();
+    expect(calls.some((call) => call.path === `/api/v1/assignments/${assignmentId}/submissions`)).toBe(true);
+  });
+
   it("shows the production password login before the app shell", async () => {
     installFetch({ appEnv: "production", requireLogin: true });
     renderApp(["/dashboard"]);
@@ -446,6 +481,7 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "スケジュール" })).toBeInTheDocument();
     expect(await screen.findAllByText("基本情報：現在地確認")).not.toHaveLength(0);
+    expect(screen.getByLabelText("カレンダー凡例")).toHaveTextContent("重要日");
     expect(await screen.findAllByText("遅延")).not.toHaveLength(0);
     fireEvent.click(await screen.findByRole("button", { name: "課題詳細へ" }));
     expect(await screen.findByRole("heading", { name: "課題" })).toBeInTheDocument();
